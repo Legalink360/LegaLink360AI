@@ -1,0 +1,15 @@
+{
+  "rewrites": [
+    {
+      "source": "/:path((?!_next).*)",
+      "destination": "/"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/404",
+      "destination": "/",
+      "permanent": false
+    }
+  ]
+}

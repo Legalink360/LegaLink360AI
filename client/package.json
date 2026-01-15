@@ -1,5 +1,5 @@
 {
-  "name": "openai-chatkit-starter-app",
+  "name": "legalink360-ai",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@openai/chatkit-react": ">=1.1.1 <2.0.0",
+    "lucide-react": "^0.408.0",
     "next": "^16.1.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"

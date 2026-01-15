@@ -1,11 +1,32 @@
 "use client";
 
-import { useCallback } from "react";
-import { ChatKitPanel, type FactAction } from "@/components/ChatKitPanel";
+import { useCallback, useState, useEffect } from "react";
+import { type FactAction } from "@/components/ChatArea";
+import { type ChatThread } from "@/components/Sidebar";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import Sidebar from "@/components/Sidebar";
+import Header from "@/components/Header";
+import ChatArea from "@/components/ChatArea";
+import Footer from "@/components/Footer";
 
 export default function App() {
   const { scheme, setScheme } = useColorScheme();
+  const [chatHistory, setChatHistory] = useState<ChatThread[]>([]);
+  const [chatKitControl, setChatKitControl] = useState<any>(null);
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+
+  // Fetch chat history on mount
+  useEffect(() => {
+    // TODO: Replace with actual backend API call to fetch threads
+    // For now, using mock data
+    const mockHistory: ChatThread[] = [
+      { id: "thread-1", title: "Contract Review Discussion", date: "Today" },
+      { id: "thread-2", title: "Corporate Law Query", date: "Yesterday" },
+      { id: "thread-3", title: "Dispute Resolution", date: "2 days ago" },
+      { id: "thread-4", title: "Legal Compliance Check", date: "1 week ago" },
+    ];
+    setChatHistory(mockHistory);
+  }, []);
 
   const handleWidgetAction = useCallback(async (action: FactAction) => {
     if (process.env.NODE_ENV !== "production") {
@@ -19,79 +40,105 @@ export default function App() {
     }
   }, []);
 
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-end bg-slate-100 dark:bg-slate-950">
-      <div className="mx-auto w-full max-w-5xl flex flex-col h-screen">
-        {/* Header Section */}
-        <div className="pt-6 pb-4 px-4">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 text-center">
-            LegaLink360 AI
-          </h1>
-          <p className="mt-6 text-sm text-slate-600 dark:text-slate-400 text-center max-w-2xl mx-auto">
-            Welcome to LegaLink360 AI by LegaLink & Co. Advocates! I&apos;m your intelligent legal assistant, here to provide guidance on corporate law, civil litigation, mediation, and more.
-          </p>
-        </div>
-        
-        {/* Chat Section */}
-        <div className="flex-1 overflow-hidden mb-2">
-          <ChatKitPanel
-            theme={scheme}
-            onWidgetAction={handleWidgetAction}
-            onResponseEnd={handleResponseEnd}
-            onThemeRequest={setScheme}
-          />
-        </div>
+  const handleNewChat = useCallback(async () => {
+    if (!chatKitControl) {
+      console.warn("[App] ChatKit control not ready");
+      return;
+    }
+    try {
+      // Call setThreadId directly on the element
+      if (typeof chatKitControl.setThreadId === "function") {
+        await chatKitControl.setThreadId(null);
+        setCurrentThreadId(null);
+      } else if (chatKitControl.control && typeof chatKitControl.control.setThreadId === "function") {
+        // Try nested control property
+        await chatKitControl.control.setThreadId(null);
+        setCurrentThreadId(null);
+      } else {
+        console.error("[App] setThreadId method not found", {
+          element: chatKitControl.tagName,
+          methods: Object.getOwnPropertyNames(Object.getPrototypeOf(chatKitControl)).slice(0, 10),
+        });
+      }
+    } catch (error) {
+      console.error("[App] Error creating new chat", error);
+    }
+  }, [chatKitControl]);
 
-        {/* Footer Section */}
-        <footer className="py-3 px-4 opacity-60">
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
-            <a 
-              href="https://legalink360.com" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
-            >
-              LegaLink360.com
-            </a>
-            <span className="text-slate-400 dark:text-slate-600">•</span>
-            <a 
-              href="https://legalink360.com/contact" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
-            >
-              Contact Us
-            </a>
-            <span className="text-slate-400 dark:text-slate-600">•</span>
-            <a 
-              href="https://legalink360.com/faq" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
-            >
-              Help
-            </a>
-            <span className="text-slate-400 dark:text-slate-600">•</span>
-            <a 
-              href="https://legalink360.com/terms" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
-            >
-              Terms & Conditions
-            </a>
-            <span className="text-slate-400 dark:text-slate-600">•</span>
-            <a 
-              href="https://legalink360.com/privacy-policy" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
-            >
-              Privacy Policy
-            </a>
-          </div>
-        </footer>
+  const handleSelectChat = useCallback(
+    async (threadId: string) => {
+      if (!chatKitControl) {
+        console.warn("[App] ChatKit control not ready");
+        return;
+      }
+      try {
+        // Call setThreadId directly on the element
+        if (typeof chatKitControl.setThreadId === "function") {
+          await chatKitControl.setThreadId(threadId);
+          setCurrentThreadId(threadId);
+        } else if (chatKitControl.control && typeof chatKitControl.control.setThreadId === "function") {
+          // Try nested control property
+          await chatKitControl.control.setThreadId(threadId);
+          setCurrentThreadId(threadId);
+        } else {
+          console.error("[App] setThreadId method not found");
+        }
+      } catch (error) {
+        console.error("[App] Error selecting chat", error);
+      }
+    },
+    [chatKitControl]
+  );
+
+  const handleThreadChange = useCallback((threadId: string | null) => {
+    setCurrentThreadId(threadId);
+  }, []);
+
+  const handleChatKitReady = useCallback((element: any) => {
+    console.debug("[App] ChatKit ready, element:", {
+      tagName: element?.tagName,
+      hasSetThreadId: typeof element?.setThreadId === "function",
+      methods: element ? Object.getOwnPropertyNames(Object.getPrototypeOf(element)).slice(0, 15) : [],
+    });
+    setChatKitControl(element);
+    
+    // Add event listener for thread updates
+    if (element && element.addEventListener) {
+      element.addEventListener("chatkit.thread-change", (event: any) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[App] thread changed", event);
+        }
+      });
+    }
+  }, []);
+
+  return (
+    <div className="flex h-screen bg-white dark:bg-slate-950">
+      {/* Sidebar */}
+      <Sidebar 
+        chatHistory={chatHistory}
+        onNewChat={handleNewChat}
+        onSelectChat={handleSelectChat}
+      />
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <Header />
+
+        {/* Unified Chat Area (Welcome + Chat Input) */}
+        <ChatArea
+          theme={scheme}
+          onWidgetAction={handleWidgetAction}
+          onResponseEnd={handleResponseEnd}
+          onThemeRequest={setScheme}
+          onThreadChange={handleThreadChange}
+          onChatKitReady={handleChatKitReady}
+        />
+
+        {/* Footer */}
+        <Footer />
       </div>
-    </main>
+    </div>
   );
 }

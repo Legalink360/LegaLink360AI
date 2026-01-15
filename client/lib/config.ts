@@ -5,24 +5,31 @@ export const WORKFLOW_ID =
 
 export const CREATE_SESSION_ENDPOINT = "/api/create-session";
 
-export const STARTER_PROMPTS: StartScreenPrompt[] = [
-  {
-    label: "What legal services do you offer?",
-    prompt: "What legal services does LegaLink360 offer?",
-  },
-  {
-    label: "How can you help me?",
-    prompt: "How can LegaLink360 AI assist with my legal questions?",
-  },
-  {
-    label: "Schedule a consultation",
-    prompt: "How do I schedule a consultation with LegaLink360?",
-  },
-];
-
 export const PLACEHOLDER_INPUT = "Ask your legal question...";
 
-export const GREETING = "How can I assist you today?";
+export const WELCOME_GREETING = "How can I help you today?";
+
+export const WELCOME_DESCRIPTION = 
+  "I'm your intelligent legal assistant by LegaLink & Co. Advocates. I'm here to provide guidance on corporate law, civil litigation, mediation, contract review, and more. Ask me anything about legal matters, and I'll help you understand complex legal concepts in simple terms.";
+
+export const STARTER_PROMPTS: StartScreenPrompt[] = [
+  {
+    label: "Contract Review",
+    prompt: "Help me review and analyze a contract",
+  },
+  {
+    label: "Legal Consultation",
+    prompt: "I have a legal question I need help with",
+  },
+  {
+    label: "Compliance Check",
+    prompt: "Help me understand regulatory compliance requirements",
+  },
+  {
+    label: "Dispute Resolution",
+    prompt: "What are my options for resolving a legal dispute",
+  },
+];
 
 export const getThemeConfig = (theme: ColorScheme): ThemeOption => ({
   color: {
@@ -37,6 +44,4 @@ export const getThemeConfig = (theme: ColorScheme): ThemeOption => ({
     },
   },
   radius: "round",
-  // Add other theme options here
-  // chatkit.studio/playground to explore config options
 });
