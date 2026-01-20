@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Mail, Trash2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { updateUserProfile } from "@/lib/auth";
 
 type UserProfileSettingsProps = {
   isOpen: boolean;
@@ -9,16 +11,30 @@ type UserProfileSettingsProps = {
 };
 
 export default function UserProfileSettings({ isOpen, onClose }: UserProfileSettingsProps) {
+  const { user, refreshUser } = useAuth();
   const [formData, setFormData] = useState({
-    firstName: "John",
-    lastName: "Doe",
-    email: "john.doe@example.com",
-    phone: "+1 (555) 123-4567",
-    jobTitle: "Legal Professional",
-    company: "Law & Associates",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    jobTitle: "",
+    company: "",
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  // Initialize form with user data
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "",
+      }));
+    }
+  }, [user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -26,12 +42,40 @@ export default function UserProfileSettings({ isOpen, onClose }: UserProfileSett
   };
 
   const handleSave = async () => {
+    if (!formData.firstName.trim() || !formData.lastName.trim()) {
+      setMessage({ type: 'error', text: 'First name and last name are required' });
+      return;
+    }
+
     setIsSaving(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setIsSaving(false);
-    console.log("Profile saved:", formData);
-    // Show success message or trigger toast
+    setMessage(null);
+
+    try {
+      const response = await updateUserProfile(
+        formData.firstName,
+        formData.lastName,
+        formData.jobTitle,
+        formData.company,
+        formData.phone
+      );
+      
+      if (response.success) {
+        setMessage({ type: 'success', text: 'Profile updated successfully!' });
+        
+        // Refresh user data in the auth context
+        await refreshUser();
+        
+        setTimeout(() => {
+          setMessage(null);
+        }, 2000);
+      } else {
+        setMessage({ type: 'error', text: response.message });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to update profile' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -175,6 +219,19 @@ export default function UserProfileSettings({ isOpen, onClose }: UserProfileSett
             </p>
           </div>
         </div>
+
+        {/* Message Display */}
+        {message && (
+          <div
+            className={`px-6 py-3 mx-6 rounded-lg ${
+              message.type === 'success'
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex gap-3 p-6 border-t border-slate-200 dark:border-slate-700 justify-end">

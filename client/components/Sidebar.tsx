@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { Menu, X, Plus, Settings, LogOut, User, FolderPlus, Search, HelpCircle, Zap, Palette, ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Menu, Plus, Settings, LogOut, User, FolderPlus, Search, HelpCircle, Zap, Palette, ChevronLeft, ChevronRight } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { signOut } from "@/lib/auth";
 import UserProfileSettings from "./UserProfileSettings";
 import SettingsPage from "./SettingsPage";
 import HelpPage from "./HelpPage";
@@ -22,6 +26,8 @@ type SidebarProps = {
 };
 
 export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: SidebarProps) {
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const [isOpen, setIsOpen] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
@@ -192,94 +198,123 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
 
         {/* Bottom Section - User Profile (Fixed) */}
         <div className="p-4 border-t border-slate-700 mt-auto">
-          {isOpen ? (
-            <div className="relative" ref={userMenuRef}>
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
-              >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
-                  <User size={16} />
-                </div>
-                <div className="text-left flex-1">
-                  <div className="text-sm font-semibold">John Doe</div>
-                  <div className="text-xs text-slate-400">Premium User</div>
-                </div>
-              </button>
-
-              {/* User Menu Dropdown */}
-              {showUserMenu && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-slate-800 border border-slate-700 rounded-lg shadow-lg overflow-hidden z-10">
-                  <button
-                    onClick={() => {
-                      setShowProfileSettings(true);
-                      setShowUserMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
-                  >
+          {!loading && user ? (
+            isOpen ? (
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
                     <User size={16} />
-                    <span>Profile Settings</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowSettings(true);
-                      setShowUserMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
-                  >
-                    <Settings size={16} />
-                    <span>Settings</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowPersonalization(true);
-                      setShowUserMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
-                  >
-                    <Palette size={16} />
-                    <span>Personalization</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowUpgrade(true);
-                      setShowUserMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
-                  >
-                    <Zap size={16} />
-                    <span>Upgrade Plan</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowHelp(true);
-                      setShowUserMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
-                  >
-                    <HelpCircle size={16} />
-                    <span>Help & Support</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Handle sign out
-                      setShowUserMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-red-400 hover:text-red-300"
-                  >
-                    <LogOut size={16} />
-                    <span>Sign Out</span>
-                  </button>
-                </div>
-              )}
-            </div>
+                  </div>
+                  <div className="text-left flex-1">
+                    <div className="text-sm font-semibold">
+                      {user?.firstName && user?.lastName
+                        ? `${user.firstName} ${user.lastName}`
+                        : user?.email?.split('@')[0] || 'User'}
+                    </div>
+                    <div className="text-xs text-slate-400">{user?.email}</div>
+                  </div>
+                </button>
+
+                {/* User Menu Dropdown */}
+                {showUserMenu && (
+                  <div className="absolute bottom-full left-0 right-0 mb-2 bg-slate-800 border border-slate-700 rounded-lg shadow-lg overflow-hidden z-10">
+                    <button
+                      onClick={() => {
+                        setShowProfileSettings(true);
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                    >
+                      <User size={16} />
+                      <span>Profile Settings</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowSettings(true);
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                    >
+                      <Settings size={16} />
+                      <span>Settings</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowPersonalization(true);
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                    >
+                      <Palette size={16} />
+                      <span>Personalization</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowUpgrade(true);
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                    >
+                      <Zap size={16} />
+                      <span>Upgrade Plan</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowHelp(true);
+                        setShowUserMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                    >
+                      <HelpCircle size={16} />
+                      <span>Help & Support</span>
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await signOut();
+                          setShowUserMenu(false);
+                          router.push('/auth/login');
+                        } catch (err) {
+                          console.error('Sign out failed:', err);
+                        }
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-red-400 hover:text-red-300"
+                    >
+                      <LogOut size={16} />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button 
+                className="w-full flex items-center justify-center h-10 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all"
+                title="User Profile"
+              >
+                <User size={18} />
+              </button>
+            )
           ) : (
-            <button 
-              className="w-full flex items-center justify-center h-10 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 hover:from-blue-500 hover:to-blue-700 transition-all"
-              title="User Profile"
-            >
-              <User size={18} />
-            </button>
+            isOpen ? (
+              <Link 
+                href="/auth/login"
+                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors text-sm font-medium text-white"
+              >
+                <User size={16} />
+                <span>Sign In</span>
+              </Link>
+            ) : (
+              <Link
+                href="/auth/login"
+                className="w-full flex items-center justify-center h-10 rounded-lg bg-blue-600 hover:bg-blue-700 transition-colors"
+                title="Sign In"
+              >
+                <User size={18} />
+              </Link>
+            )
           )}
         </div>
       </aside>

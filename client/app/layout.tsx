@@ -1,6 +1,7 @@
 import Script from "next/script";
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/hooks/useAuth";
 
 export const metadata: Metadata = {
   title: "LegaLink360 AI",
@@ -23,7 +24,11 @@ export default function RootLayout({
           strategy="beforeInteractive"
         />
       </head>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }
