@@ -12,15 +12,24 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Lazy-load Supabase client to avoid errors during build
+let supabase: any = null;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+function getSupabaseClient() {
+  if (supabase) {
+    return supabase;
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+  return supabase;
 }
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
  * Auth Service - Wrapper around Supabase Auth
@@ -53,7 +62,7 @@ export async function signUpWithEmail(
 ): Promise<AuthResponse> {
   try {
     // Sign up with Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await getSupabaseClient().auth.signUp({
       email,
       password,
       options: {
@@ -81,7 +90,7 @@ export async function signUpWithEmail(
     }
 
     // Create user profile in custom table
-    const { error: profileError } = await supabase.from('user_profiles').insert({
+    const { error: profileError } = await getSupabaseClient().from('user_profiles').insert({
       id: data.user.id,
       email: data.user.email,
       first_name: firstName,
@@ -122,7 +131,7 @@ export async function signInWithEmail(
   password: string
 ): Promise<AuthResponse> {
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await getSupabaseClient().auth.signInWithPassword({
       email,
       password,
     });
@@ -194,7 +203,7 @@ export async function signInWithEmail(
  */
 export async function signOut(): Promise<AuthResponse> {
   try {
-    const { error } = await supabase.auth.signOut();
+    const { error } = await getSupabaseClient().auth.signOut();
 
     if (error) {
       return {
@@ -223,7 +232,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const {
       data: { user },
       error,
-    } = await supabase.auth.getUser();
+    } = await getSupabaseClient().auth.getUser();
 
     if (error || !user) {
       return null;
@@ -232,7 +241,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     // Try to fetch profile data by id, but don't block if it fails (RLS may restrict access)
     let profile: any = null;
     try {
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData, error: profileError } = await getSupabaseClient()
         .from('user_profiles')
         .select('*')
         .eq('id', user.id);
@@ -273,7 +282,7 @@ export async function updateUserProfile(
   try {
     const {
       data: { user },
-    } = await supabase.auth.getUser();
+    } = await getSupabaseClient().auth.getUser();
 
     if (!user) {
       return {
@@ -283,7 +292,7 @@ export async function updateUserProfile(
     }
 
     // Update profile with all fields
-    const { error } = await supabase
+    const { error } = await getSupabaseClient()
       .from('user_profiles')
       .update({
         first_name: firstName,
@@ -320,7 +329,7 @@ export async function updateUserProfile(
  */
 export async function sendPasswordResetEmail(email: string): Promise<AuthResponse> {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await getSupabaseClient().auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password`,
     });
 
@@ -348,7 +357,7 @@ export async function sendPasswordResetEmail(email: string): Promise<AuthRespons
  */
 export async function updatePassword(newPassword: string): Promise<AuthResponse> {
   try {
-    const { error } = await supabase.auth.updateUser({
+    const { error } = await getSupabaseClient().auth.updateUser({
       password: newPassword,
     });
 
@@ -376,7 +385,7 @@ export async function updatePassword(newPassword: string): Promise<AuthResponse>
  */
 export async function resendVerificationEmail(email: string): Promise<AuthResponse> {
   try {
-    const { error } = await supabase.auth.resend({
+    const { error } = await getSupabaseClient().auth.resend({
       type: 'signup',
       email,
       options: {
@@ -407,7 +416,7 @@ export async function resendVerificationEmail(email: string): Promise<AuthRespon
  * Listen to auth state changes
  */
 export function onAuthStateChange(callback: (user: AuthUser | null) => void): (() => void) {
-  const subscription = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
+  const subscription = getSupabaseClient().auth.onAuthStateChange(async (_event: any, session: any) => {
     try {
       if (session?.user) {
         const user = await getCurrentUser();
