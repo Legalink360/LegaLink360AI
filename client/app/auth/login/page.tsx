@@ -27,10 +27,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Add timeout for the login request (30 seconds to allow for slow network)
+      // Add timeout for the login request (60 seconds for Vercel's network latency)
       const loginPromise = signInWithEmail(email, password);
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Login request timed out. Please try again.')), 30000)
+        setTimeout(() => reject(new Error('Login request timed out. Please try again.')), 60000)
       );
 
       const response: any = await Promise.race([loginPromise, timeoutPromise]);
