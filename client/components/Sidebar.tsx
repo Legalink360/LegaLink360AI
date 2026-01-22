@@ -63,6 +63,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
     },
     { label: "New Project", icon: FolderPlus, href: "#" },
     { label: "Search chats", icon: Search, href: "#" },
+    { label: "Learn More", icon: HelpCircle, href: "/" },
   ];
 
   return (

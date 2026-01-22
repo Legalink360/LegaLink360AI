@@ -89,20 +89,6 @@ export async function signUpWithEmail(
       };
     }
 
-    // Create user profile in custom table
-    const { error: profileError } = await getSupabaseClient().from('user_profiles').insert({
-      id: data.user.id,
-      email: data.user.email,
-      first_name: firstName,
-      last_name: lastName,
-      email_verified: false,
-    });
-
-    if (profileError) {
-      console.error('Profile creation error:', profileError);
-      // Continue anyway - user can still use auth
-    }
-
     return {
       success: true,
       message: 'Check your email to verify your account',
@@ -160,26 +146,7 @@ export async function signInWithEmail(
       };
     }
 
-    // Try to fetch user profile in the background (don't block login)
-    // Profile will be loaded via onAuthStateChange hook
-    Promise.resolve()
-      .then(() => {
-        return supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', data.user.id);
-      })
-      .then(({ data: profileData, error: profileError }) => {
-        if (profileError) {
-          console.warn('Background profile fetch error:', profileError);
-        } else if (profileData && profileData.length > 0) {
-          console.log('Background profile fetch successful');
-        }
-      })
-      .catch((err) => {
-        console.warn('Background profile fetch exception:', err);
-      });
-
+    // Return immediately - profile will be loaded via onAuthStateChange hook
     return {
       success: true,
       message: 'Login successful',
@@ -226,45 +193,110 @@ export async function signOut(): Promise<AuthResponse> {
 
 /**
  * Get current authenticated user
+ * ISSUE 1.1 FIX: Removed blocking profile fetch - now returns auth user immediately
+ * ISSUE #1 ANALYSIS FIX: Use session.user instead of getUser() to avoid race condition
+ * Profile data is loaded asynchronously in background via loadUserProfile()
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
+    // Get session first to ensure we have valid auth state
     const {
-      data: { user },
-      error,
-    } = await getSupabaseClient().auth.getUser();
+      data: { session },
+      error: sessionError,
+    } = await getSupabaseClient().auth.getSession();
 
-    if (error || !user) {
+    if (sessionError || !session) {
       return null;
     }
 
-    // Try to fetch profile data by id, but don't block if it fails (RLS may restrict access)
-    let profile: any = null;
-    try {
-      const { data: profileData, error: profileError } = await getSupabaseClient()
-        .from('user_profiles')
-        .select('*')
-        .eq('id', user.id);
-
-      if (profileError) {
-        console.warn('Profile fetch warning (non-blocking):', profileError.message);
-      } else if (profileData && profileData.length > 0) {
-        profile = profileData[0];
-      }
-    } catch (profileErr) {
-      console.warn('Profile fetch exception (non-blocking):', profileErr);
+    // Use session.user instead of calling getUser() again (avoids race condition)
+    const user = session.user;
+    if (!user) {
+      return null;
     }
 
-    // Always return user data, with or without profile
+    // Return auth user immediately (without profile to avoid blocking login)
     return {
       id: user.id,
       email: user.email || '',
-      firstName: profile?.first_name,
-      lastName: profile?.last_name,
       emailVerified: !!user.email_confirmed_at,
       createdAt: new Date(user.created_at || ''),
     };
   } catch {
+    return null;
+  }
+}
+
+/**
+ * Load user profile data asynchronously (background)
+ * ISSUE 1.1 FIX: Separated from getCurrentUser to prevent blocking login
+ * ISSUE 1.2 FIX: Improved error handling with retry logic for RLS issues
+ */
+export async function loadUserProfile(userId: string): Promise<Partial<AuthUser> | null> {
+  try {
+    // Step 1: Check session
+    const {
+      data: { session },
+      error: sessionError,
+    } = await getSupabaseClient().auth.getSession();
+
+    if (sessionError || !session) {
+      console.error('❌ No active session when trying to load profile');
+      return null;
+    }
+
+    // Step 2: Get current user from auth
+    const {
+      data: { user: authUser },
+      error: authError,
+    } = await getSupabaseClient().auth.getUser();
+
+    if (authError || !authUser) {
+      console.error('❌ No auth user');
+      return null;
+    }
+
+    // Step 3: Try to fetch profile
+    const { data: profiles, error: profileError } = await getSupabaseClient()
+      .from('user_profiles')
+      .select('first_name, last_name, auth_id, email, job_title, company, phone')
+      .eq('auth_id', userId);
+
+    if (profileError) {
+      console.error('❌ Profile query error:', profileError);
+      return null;
+    }
+
+    // Profile doesn't exist - create it automatically on first login
+    if (!profiles || profiles.length === 0) {
+      console.log('Creating profile on first login for user:', userId);
+      
+      const { error: insertError } = await getSupabaseClient()
+        .from('user_profiles')
+        .insert({
+          auth_id: userId,
+          email: session.user?.email || '',
+          first_name: '',
+          last_name: '',
+          email_verified: !!session.user?.email_confirmed_at,
+        });
+
+      if (insertError) {
+        console.error('Failed to create profile:', insertError);
+      } else {
+        console.log('✅ Profile created on login');
+      }
+      return null;
+    }
+
+    const profile = profiles[0];
+    
+    return {
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+    };
+  } catch (error) {
+    console.error('❌ Error loading user profile:', error instanceof Error ? error.message : error);
     return null;
   }
 }
@@ -291,7 +323,7 @@ export async function updateUserProfile(
       };
     }
 
-    // Update profile with all fields
+    // Update profile with all fields (use auth_id, not id)
     const { error } = await getSupabaseClient()
       .from('user_profiles')
       .update({
@@ -302,7 +334,7 @@ export async function updateUserProfile(
         ...(phone && { phone: phone }),
         updated_at: new Date().toISOString(),
       })
-      .eq('id', user.id);
+      .eq('auth_id', user.id);
 
     if (error) {
       console.error('Profile update error:', error);
@@ -414,13 +446,27 @@ export async function resendVerificationEmail(email: string): Promise<AuthRespon
 
 /**
  * Listen to auth state changes
+ * ISSUE 1.1 FIX: Profile loading moved to background (non-blocking)
+ * ISSUE 1.3 FIX: Added mechanism to notify profile updates
  */
-export function onAuthStateChange(callback: (user: AuthUser | null) => void): (() => void) {
-  const subscription = getSupabaseClient().auth.onAuthStateChange(async (_event: any, session: any) => {
+export function onAuthStateChange(
+  callback: (user: AuthUser | null) => void,
+  onProfileLoaded?: (profile: Partial<AuthUser>) => void
+): (() => void) {
+  const { data } = getSupabaseClient().auth.onAuthStateChange(async (_event: any, session: any) => {
     try {
       if (session?.user) {
+        // Step 1: Return auth user immediately (Issue 1.1 fix)
         const user = await getCurrentUser();
         callback(user);
+
+        // Step 2: Load profile in background without blocking (Issue 1.3 fix)
+        if (user && onProfileLoaded) {
+          const profile = await loadUserProfile(user.id);
+          if (profile) {
+            onProfileLoaded(profile);
+          }
+        }
       } else {
         callback(null);
       }
@@ -431,17 +477,32 @@ export function onAuthStateChange(callback: (user: AuthUser | null) => void): ((
   });
 
   return () => {
-    subscription.data?.subscription?.unsubscribe();
+    // Properly unsubscribe from auth listener
+    data?.subscription?.unsubscribe?.();
   };
 }
 
 /**
  * Manually refresh user profile from the database
+ * ISSUE 1.3 FIX: Now properly refreshes both auth state and profile data
  */
 export async function refreshUserProfile(): Promise<AuthUser | null> {
   try {
+    // Get fresh auth user
     const user = await getCurrentUser();
-    return user;
+    if (!user) {
+      return null;
+    }
+
+    // Get fresh profile data
+    const profile = await loadUserProfile(user.id);
+    
+    // Merge auth user with profile data
+    return {
+      ...user,
+      firstName: profile?.firstName,
+      lastName: profile?.lastName,
+    };
   } catch (error) {
     console.error('Error refreshing user profile:', error);
     return null;

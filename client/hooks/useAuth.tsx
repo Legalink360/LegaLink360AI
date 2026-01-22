@@ -3,12 +3,15 @@
  * 
  * Custom React hook to manage authentication state
  * Provides access to current user, loading state, and auth functions
+ * 
+ * ISSUE 1.1 FIX: Auth user returned immediately, profile loads in background
+ * ISSUE 1.3 FIX: Proper profile sync after updates
  */
 
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import { AuthUser, getCurrentUser, onAuthStateChange, refreshUserProfile } from '@/lib/auth';
+import { AuthUser, getCurrentUser, onAuthStateChange, refreshUserProfile, loadUserProfile } from '@/lib/auth';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -33,20 +36,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
     const initAuth = async () => {
-      const currentUser = await getCurrentUser();
-      setUser(currentUser);
-      setLoading(false);
+      try {
+        // Step 1: Try to get current user (with retry on first attempt)
+        let currentUser = await getCurrentUser();
+        
+        // Step 2: If we get null but there's a session, wait and retry
+        // This fixes race condition on page refresh
+        if (!currentUser) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          currentUser = await getCurrentUser();
+        }
+        
+        if (isMounted) {
+          setUser(currentUser);
+          
+          // Step 3: Load profile in background if user exists
+          if (currentUser) {
+            const profile = await loadUserProfile(currentUser.id);
+            if (isMounted && profile) {
+              setUser(prev => prev ? { ...prev, ...profile } : null);
+            }
+          }
+          
+          // Step 4: Set loading to false only when we have a definitive answer
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        if (isMounted) {
+          setUser(null);
+          setLoading(false);
+        }
+      }
     };
 
     initAuth();
 
-    const unsubscribe = onAuthStateChange((updatedUser: AuthUser | null) => {
-      setUser(updatedUser);
-      setLoading(false);
-    });
+    // Set up auth state listener with background profile loading
+    const unsubscribe = onAuthStateChange(
+      (updatedUser: AuthUser | null) => {
+        if (isMounted) {
+          setUser(updatedUser);
+          setLoading(false);
+        }
+      },
+      (profile) => {
+        // Called when profile finishes loading in background
+        if (isMounted) {
+          setUser(prev => prev ? { ...prev, ...profile } : null);
+        }
+      }
+    );
 
     return () => {
+      isMounted = false;
       if (unsubscribe) {
         unsubscribe();
       }

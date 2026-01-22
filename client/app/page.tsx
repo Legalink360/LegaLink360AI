@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import App from './App';
 import Link from 'next/link';
 import { 
   ArrowRight, 
@@ -18,20 +20,69 @@ import {
 } from 'lucide-react';
 
 export default function Home() {
+  const { isAuthenticated, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   const handleNewsletterSignup = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
-      setIsSubmitted(true);
-      setEmail('');
-      setTimeout(() => setIsSubmitted(false), 5000);
-    }
+    // TODO: Implement newsletter signup API call
+    setIsSubmitted(true);
+    setEmail('');
+    setTimeout(() => setIsSubmitted(false), 5000);
   };
 
+  // Timeout for loading state (should not take more than 5 seconds)
+  useEffect(() => {
+    if (!loading) {
+      setLoadingTimeout(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.error('⚠️ Auth initialization timeout - page still loading after 5 seconds');
+        setLoadingTimeout(true);
+      }
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [loading]);
+
+  // Show chat app if authenticated
+  if (isAuthenticated && !loading) {
+    return <App />;
+  }
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Loading...</p>
+          {loadingTimeout && (
+            <div className="mt-6">
+              <p className="text-red-600 dark:text-red-400 text-sm font-medium mb-4">
+                Taking longer than expected...
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Refresh Page
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Show landing page if not authenticated
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950">
+    <>
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-50 border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
@@ -41,12 +92,20 @@ export default function Home() {
             </h1>
           </Link>
           <div className="flex gap-4">
-            <Link href="/auth/login" className="px-6 py-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors font-medium">
-              Login
-            </Link>
-            <Link href="/auth/signup" className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all hover:shadow-lg">
-              Get Started Free
-            </Link>
+            {!isAuthenticated ? (
+              <>
+                <Link href="/auth/login" className="px-6 py-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors font-medium">
+                  Login
+                </Link>
+                <Link href="/auth/signup" className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all hover:shadow-lg">
+                  Get Started Free
+                </Link>
+              </>
+            ) : (
+              <Link href="/" className="px-6 py-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors">
+                Back to Chat
+              </Link>
+            )}
           </div>
         </div>
       </nav>
@@ -463,6 +522,6 @@ export default function Home() {
           <p>&copy; 2026 LegaLink360. All rights reserved. | Transforming Legal Practice with AI</p>
         </div>
       </footer>
-    </div>
+    </>
   );
 }

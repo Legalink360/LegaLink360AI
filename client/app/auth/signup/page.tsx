@@ -300,7 +300,7 @@ export default function SignupPage() {
               </span>
             </button>
 
-            {/* Microsoft 365 */}
+            {/* ..............Microsoft 365 
             <button
               type="button"
               className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
@@ -315,6 +315,7 @@ export default function SignupPage() {
                 Sign up with Microsoft
               </span>
             </button>
+            ...................*/}
           </div>
         </div>
 
