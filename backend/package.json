@@ -1,0 +1,28 @@
+{
+  "name": "legalink360-backend",
+  "version": "1.0.0",
+  "description": "LegaLink360 Backend Services - Document Ingestion, Vector Indexing, Legal AI",
+  "main": "index.js",
+  "scripts": {
+    "test-connections": "ts-node scripts/testConnections.ts",
+    "ingest-sample": "ts-node scripts/ingestSampleDocuments.ts",
+    "ingest-custom": "ts-node scripts/ingestCustomDocuments.ts"
+  },
+  "dependencies": {
+    "@pinecone-database/pinecone": "^6.1.4",
+    "@supabase/supabase-js": "^2.38.5",
+    "dotenv": "^16.3.1",
+    "openai": "^4.52.0",
+    "pdf-parse": "^1.1.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/pdf-parse": "^1.1.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
