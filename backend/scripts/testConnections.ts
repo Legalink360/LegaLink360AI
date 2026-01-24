@@ -146,7 +146,7 @@ async function testAllConnections() {
   if (allPassed) {
     console.log('✅ ALL CONNECTIONS PASSED - Backend is ready for ingestion!\n');
     console.log('Next steps:');
-    console.log('  1. npm run ingest-sample    (test with sample documents)');
+    console.log('  1. npm run ingest-uganda-laws    (test with Uganda laws documents)');
     console.log('  2. npm run ingest-custom    (ingest your legal documents)');
     console.log('  3. Start building retrieval API\n');
   } else {

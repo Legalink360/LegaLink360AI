@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test-connections": "ts-node scripts/testConnections.ts",
-    "ingest-sample": "ts-node scripts/ingestSampleDocuments.ts",
+    "test-search": "ts-node scripts/testSemanticSearch.ts",
+    "ingest-uganda-laws": "ts-node scripts/ingestUgandaLaws.ts",
     "ingest-custom": "ts-node scripts/ingestCustomDocuments.ts"
   },
   "dependencies": {
