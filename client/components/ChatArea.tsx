@@ -11,6 +11,7 @@ import {
   STARTER_PROMPTS,
 } from "@/lib/config";
 import type { ColorScheme } from "@/hooks/useColorScheme";
+import { useLegalChat } from "@/hooks/useLegalChat";
 
 export type FactAction = {
   type: "save";
@@ -51,6 +52,9 @@ export default function ChatArea({
   onThreadChange,
   onChatKitReady,
 }: ChatAreaProps) {
+  // Legal Chat Hook
+  const { loading: legalChatLoading, error: legalChatError, queryLegalAI } = useLegalChat();
+
   // ChatKit Logic
   const processedFacts = useRef(new Set<string>());
   const chatKitRef = useRef<any>(null);

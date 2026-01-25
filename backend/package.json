@@ -4,6 +4,8 @@
   "description": "LegaLink360 Backend Services - Document Ingestion, Vector Indexing, Legal AI",
   "main": "index.js",
   "scripts": {
+    "start": "ts-node server.ts",
+    "dev": "ts-node server.ts",
     "test-connections": "ts-node scripts/testConnections.ts",
     "test-search": "ts-node scripts/testSemanticSearch.ts",
     "ingest-uganda-laws": "ts-node scripts/ingestUgandaLaws.ts",
@@ -12,7 +14,11 @@
   "dependencies": {
     "@pinecone-database/pinecone": "^6.1.4",
     "@supabase/supabase-js": "^2.38.5",
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "cors": "^2.8.5",
     "dotenv": "^16.3.1",
+    "express": "^4.18.2",
     "openai": "^4.52.0",
     "pdf-parse": "^1.1.1",
     "uuid": "^9.0.1"

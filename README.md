@@ -197,6 +197,10 @@ LegaLink360 uses a modern, scalable architecture with clear separation of concer
         │  (Vectors)│   │(Metadata)│  │  (Models) │
         └───────────┘   └──────────┘  └───────────┘
 ```
+## System Visual Architecture
+<div align="center">
+  <img src="client/assets/Project-architecture.png" alt="LegaLink360 Architecture" width="800" height="auto" />
+</div>
 
 ### Component Details
 

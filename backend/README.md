@@ -217,6 +217,14 @@ npm run test-connections
 ```bash
 npm run build
 ```
+## npm Scripts
+```bash
+npm run start              # Start server
+npm run dev               # Start server (same as start)
+npm run test-connections  # Test all API connections
+npm run test-search       # Test semantic search
+npm run ingest-uganda-laws # Ingest data
+```
 
 ### Debugging
 
