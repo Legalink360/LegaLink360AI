@@ -11,6 +11,26 @@ export class LLMService {
   }
 
   /**
+   * Generate disclaimer text for all responses
+   */
+  private getDisclaimer(): string {
+    return `
+
+---
+
+⚖️ **DISCLAIMER**
+
+This response is based on available legal documents and is provided for informational purposes only. It does not constitute legal advice. Every legal situation is unique and requires professional evaluation.
+
+**Would you like to speak with a qualified lawyer?** 
+Visit **www.legalink360.com** to connect with our legal professionals who can provide personalized guidance, expert advice, and further support for your specific legal needs.
+
+**Need More Help?** Our team of experienced lawyers is ready to assist you. Visit **legalink360.com** today!
+
+---`;
+  }
+
+  /**
    * Generate answer using retrieved documents and GPT-4
    */
   async generateAnswer(
@@ -61,7 +81,8 @@ Please provide a comprehensive answer citing the relevant sources using [Source 
       console.log(`   ✓ Answer generated in ${elapsed}ms`);
       console.log(`   ✓ Tokens used: ${response.usage?.total_tokens}\n`);
 
-      return response.choices[0].message.content || 'No response generated';
+      const answer = response.choices[0].message.content || 'No response generated';
+      return answer + this.getDisclaimer();
     } catch (error: any) {
       throw new Error(`LLM generation failed: ${error.message}`);
     }
@@ -106,6 +127,9 @@ Be professional and accurate.`;
           yield chunk.choices[0].delta.content;
         }
       }
+
+      // Yield disclaimer at the end of stream
+      yield this.getDisclaimer();
 
       console.log('   ✓ Stream completed\n');
     } catch (error: any) {

@@ -1,21 +1,40 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { RetrievalService } from './services/retrievalService';
 import { LLMService } from './services/llmService';
 
-dotenv.config({ path: '.env.local' });
+// Load environment variables only in development
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: '.env.local' });
+}
 
 const app = express();
-const PORT = process.env.APP_PORT || 3001;
+const PORT = process.env.PORT || process.env.APP_PORT || 3001;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Initialize services
 const retrievalService = new RetrievalService();
 const llmService = new LLMService();
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+// CORS configuration - specify allowed origins for production
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  process.env.CLIENT_URL, // Production client URL from env
+].filter(Boolean);
+
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? allowedOrigins 
+    : true, // Allow all in development
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+app.use(express.json({ limit: '10mb' }));
 
 // Logging middleware
 app.use((req, res, next) => {
@@ -270,6 +289,25 @@ app.use((req: Request, res: Response) => {
 });
 
 // ============================================================================
+// GLOBAL ERROR HANDLING MIDDLEWARE
+// ============================================================================
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.error(`\n❌ ERROR at ${req.method} ${req.path}`);
+  console.error(`   ${err.message}\n`);
+  
+  // Ensure we don't expose sensitive details in production
+  const message = NODE_ENV === 'production' 
+    ? 'Internal server error'
+    : err.message;
+  
+  res.status(err.status || 500).json({
+    error: 'Server error',
+    message: message,
+    ...(NODE_ENV !== 'production' && { stack: err.stack }),
+  });
+});
+
+// ============================================================================
 // START SERVER
 // ============================================================================
 app.listen(PORT, () => {
@@ -277,14 +315,16 @@ app.listen(PORT, () => {
   console.log('🚀 LEGALINK360 BACKEND SERVER');
   console.log(`${'═'.repeat(70)}`);
   console.log(`\n📍 Server: http://localhost:${PORT}`);
+  console.log(`🌍 Environment: ${NODE_ENV.toUpperCase()}`);
   console.log(`\n📡 Available Endpoints:`);
   console.log(`   • GET  /health                    - Health check`);
   console.log(`   • POST /api/retrieve              - Search documents`);
   console.log(`   • POST /api/query                 - Full RAG query`);
   console.log(`   • POST /api/query/stream          - Streaming response`);
-  console.log(`\n🔗 Environment:`);
-  console.log(`   • Pinecone Index: ${process.env.PINECONE_INDEX_NAME}`);
-  console.log(`   • OpenAI Model: gpt-4-turbo`);
-  console.log(`   • Database: Supabase PostgreSQL`);
-  console.log(`\n${'═'.repeat(70)}\n`);
+  console.log(`\n🔗 Configuration:`);
+  console.log(`   • Pinecone Index: ${process.env.PINECONE_INDEX_NAME || 'NOT SET'}`);
+  console.log(`   • OpenAI Model: ${process.env.OPENAI_CHAT_MODEL || 'gpt-4-turbo'}`);
+  console.log(`   • Supabase URL: ${process.env.SUPABASE_URL ? '✓ Configured' : '✗ NOT SET'}`);
+  console.log(`\n✅ Server ready to accept requests`);
+  console.log(`${'═'.repeat(70)}\n`);
 });
