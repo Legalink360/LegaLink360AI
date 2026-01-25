@@ -1,7 +1,7 @@
 # Legalink360 AI Platform
 
 <div align="center">
-  <img src="client/public/logo/LegaLink360.jpg" alt="LegaLink360 Logo" width="200" height="auto" />
+  <img src="client/public/logo/LegaLink360.jpg" alt="LegaLink360 Logo" width="800" height="auto" />
 </div>
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
