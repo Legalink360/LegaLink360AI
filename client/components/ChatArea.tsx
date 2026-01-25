@@ -13,6 +13,9 @@ import {
 import type { ColorScheme } from "@/hooks/useColorScheme";
 import { useLegalChat } from "@/hooks/useLegalChat";
 
+// Get API base URL from environment, default to localhost for development
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+
 export type FactAction = {
   type: "save";
   factId: string;
@@ -23,7 +26,8 @@ type ChatAreaProps = {
   theme: ColorScheme;
   onWidgetAction: (action: FactAction) => Promise<void>;
   onResponseEnd: () => void;
-  onThemeRequest: (scheme: ColorScheme) => void;  onThreadChange?: (threadId: string | null) => void;
+  onThemeRequest: (scheme: ColorScheme) => void;
+  onThreadChange?: (threadId: string | null) => void;
   onChatKitReady?: (control: any) => void;
 };
 
@@ -52,8 +56,10 @@ export default function ChatArea({
   onThreadChange,
   onChatKitReady,
 }: ChatAreaProps) {
-  // Legal Chat Hook
-  const { loading: legalChatLoading, error: legalChatError, queryLegalAI } = useLegalChat();
+  // Legal Chat Hook - exposes queryLegalAI and retrieveDocuments functions
+  const { 
+    queryLegalAI: queryLegalAIFromHook
+  } = useLegalChat();
 
   // ChatKit Logic
   const processedFacts = useRef(new Set<string>());
@@ -252,6 +258,101 @@ export default function ChatArea({
     [isWorkflowConfigured, setErrorState]
   );
 
+  /**
+   * Get the disclaimer to append to responses
+   */
+  const getDisclaimer = useCallback((): string => {
+    return `
+
+---
+
+⚖️ **DISCLAIMER**
+
+This response is based on available legal documents and is provided for informational purposes only. It does not constitute legal advice.
+
+**Would you like to speak with a qualified lawyer?** 
+
+Visit **[www.legalink360.com](https://www.legalink360.com)** to connect with our legal professionals and get personalized legal guidance for your specific situation.`;
+  }, []);
+
+  /**
+   * Query legal AI and format response for ChatKit
+   * This is called via the custom client tool handler
+   */
+  const handleLegalQuery = useCallback(
+    async (query: string) => {
+      try {
+        if (isDev) {
+          console.debug("[ChatArea] handleLegalQuery invoked", { query });
+        }
+
+        let response;
+
+        // Use the hook's queryLegalAI if available
+        if (queryLegalAIFromHook) {
+          const result = await queryLegalAIFromHook(query);
+          if (!result) {
+            throw new Error('Query failed');
+          }
+          response = result;
+        } else {
+          // Fallback: Direct API call
+          const apiResponse = await fetch(`${API_BASE_URL}/api/query`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ query }),
+          });
+
+          if (!apiResponse.ok) {
+            throw new Error(`API error: ${apiResponse.status}`);
+          }
+
+          response = await apiResponse.json();
+        }
+        
+        if (isDev) {
+          console.debug("[ChatArea] Legal AI response received", {
+            sources: response.sourceCount,
+            time: response.elapsedTime,
+          });
+        }
+
+        // Format response with sources and disclaimer
+        let formattedResponse = response.answer;
+        
+        // Add sources section if available
+        if (response.sources && response.sources.length > 0) {
+          formattedResponse += '\n\n**Sources:**\n';
+          response.sources.forEach((source: { title: string; category: string }, index: number) => {
+            formattedResponse += `${index + 1}. ${source.title} (${source.category})\n`;
+          });
+        }
+
+        // Add disclaimer
+        formattedResponse += getDisclaimer();
+
+        return {
+          success: true,
+          message: formattedResponse,
+          metadata: {
+            sources: response.sourceCount,
+            elapsedTime: response.elapsedTime,
+          },
+        };
+      } catch (error) {
+        console.error("[ChatArea] Legal query error", error);
+        return {
+          success: false,
+          message: `I encountered an error while querying the legal knowledge base. Please try again. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          metadata: {},
+        };
+      }
+    },
+    [getDisclaimer, queryLegalAIFromHook]
+  );
+
   const chatkit = useChatKit({
     api: { getClientSecret },
     theme: {
@@ -300,6 +401,23 @@ export default function ChatArea({
           factText: text.replace(/\s+/g, " ").trim(),
         });
         return { success: true };
+      }
+
+      // NEW: Handle legal knowledge queries
+      if (invocation.name === "query_legal_knowledge") {
+        const query = String(invocation.params.query ?? "");
+        if (!query) {
+          return { 
+            success: false, 
+            message: "No query provided" 
+          };
+        }
+
+        if (isDev) {
+          console.debug("[ChatArea] query_legal_knowledge invoked", { query });
+        }
+
+        return await handleLegalQuery(query);
       }
 
       return { success: false };

@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
 
+// Get API base URL from environment, default to localhost for development
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+
 interface Source {
   rank: number;
   id?: string;
@@ -48,7 +51,7 @@ export function useLegalChat() {
       try {
         console.log('[useLegalChat] Querying: ', query);
 
-        const response = await fetch('http://localhost:3001/api/query', {
+        const response = await fetch(`${API_BASE_URL}/api/query`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -91,7 +94,7 @@ export function useLegalChat() {
       try {
         console.log('[useLegalChat] Retrieving documents for: ', query);
 
-        const response = await fetch('http://localhost:3001/api/retrieve', {
+        const response = await fetch(`${API_BASE_URL}/api/retrieve`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -133,7 +136,7 @@ export function useLegalChat() {
       try {
         console.log('[useLegalChat] Streaming query: ', query);
 
-        const response = await fetch('http://localhost:3001/api/query/stream', {
+        const response = await fetch(`${API_BASE_URL}/api/query/stream`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
