@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, Plus, Settings, LogOut, User, FolderPlus, Search, HelpCircle, Zap, Palette, ChevronsLeft } from "lucide-react";
+import { Menu, Plus, Settings, LogOut, User, FolderPlus, HelpCircle, Zap, Palette, ChevronsLeft, BookOpen, BoxIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/lib/auth";
 import UserProfileSettings from "./UserProfileSettings";
@@ -62,7 +62,8 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
       }
     },
     { label: "New Project", icon: FolderPlus, href: "#" },
-    { label: "Search chats", icon: Search, href: "#" },
+     { label: "Case Diary", icon: BoxIcon, href: "#" },
+      { label: "Document Review", icon: BookOpen, href: "#" },
     { 
       label: "Learn More", 
       icon: HelpCircle, 
@@ -97,16 +98,16 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
           {/* Logo and Collapse Button */}
           <div className="flex items-center justify-between gap-2">
             <div className={`flex items-center gap-3 flex-1 ${!isOpen && "justify-center"}`}>
-              <div className="w-10 h-10 bg-white rounded-lg p-1 flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 bg-white rounded-lg p-0 flex items-center justify-center flex-shrink-0">
                 <Image
                   src="/logo/LegaLink360.jpg"
                   alt="LegaLink360"
                   width={40}
                   height={40}
-                  className="w-full h-full object-cover rounded"
+                  className="w-full h-full object-cover rounded-md"
                 />
               </div>
-              {isOpen && <span className="font-bold text-sm whitespace-nowrap">LegaLink360</span>}
+              {isOpen && <span className="font-bold text-sm whitespace-nowrap"></span>}
             </div>
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -117,7 +118,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
             </button>
             <button
               onClick={() => setIsOpen(false)}
-              className="lg:hidden flex items-center cursor-pointer justify-center w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 transition-colors flex-shrink-0"
+              className="lg:hidden flex items-center cursor-pointer justify-center ml-4 w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 transition-colors flex-shrink-0"
             >
               <ChevronsLeft size={20} className="text-slate-200"/>
             </button>
@@ -292,6 +293,14 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                       <HelpCircle size={16} />
                       <span>Help & Support</span>
                     </button>
+                    <Link
+                      href="/"
+                      onClick={() => setShowUserMenu(false)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                    >
+                      <BookOpen size={16} />
+                      <span>Learn More</span>
+                    </Link>
                     <button
                       onClick={async () => {
                         try {
