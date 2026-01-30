@@ -118,22 +118,22 @@ export default function Home() {
       <nav className="fixed top-0 w-full bg-white/80 dark:bg-slate-950/80 backdrop-blur-md z-50 border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <Link href="/">
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent cursor-pointer">
+            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent cursor-pointer">
               LegaLink360
             </h1>
           </Link>
-          <div className="flex gap-4">
+          <div className="flex gap-2 sm:gap-4 items-center">
             {!isAuthenticated ? (
               <>
-                <Link href="/auth/login" className="px-6 py-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors font-medium">
+                <Link href="/auth/login" className="hidden sm:block px-4 sm:px-6 py-2 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors font-medium text-sm sm:text-base">
                   Login
                 </Link>
-                <Link href="/auth/signup" className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all hover:shadow-lg">
-                  Get Started Free
+                <Link href="/auth/login" className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold text-xs sm:text-sm transition-all shadow-md hover:shadow-xl">
+                  Get Started
                 </Link>
               </>
             ) : (
-              <Link href="/" className="px-6 py-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors">
+              <Link href="/" className="px-4 sm:px-6 py-2.5 sm:py-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg font-medium transition-all text-sm sm:text-base">
                 Back to Chat
               </Link>
             )}
@@ -157,7 +157,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Link href="/auth/signup" className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold text-lg transition-all hover:shadow-2xl hover:scale-105">
+            <Link href="/auth/login" className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold text-lg transition-all hover:shadow-2xl hover:scale-105">
               Start Free Trial <ArrowRight className="ml-2 w-5 h-5" />
             </Link>
             <Link href="#features" className="inline-flex items-center justify-center px-8 py-4 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
@@ -384,7 +384,7 @@ export default function Home() {
               <p className="text-slate-600 dark:text-slate-400 mb-6">Perfect for solo practitioners</p>
               <div className="text-4xl font-bold text-slate-900 dark:text-white mb-1">Free</div>
               <p className="text-slate-600 dark:text-slate-400 mb-8">Forever, no credit card required</p>
-              <Link href="/auth/signup" className="block w-full py-3 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-lg font-semibold text-center hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors mb-8">
+              <Link href="/auth/login" className="block w-full py-3 bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white rounded-lg font-semibold text-center hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors mb-8">
                 Get Started
               </Link>
               <ul className="space-y-4">
@@ -410,7 +410,7 @@ export default function Home() {
               <p className="text-blue-100 mb-6">For growing firms & departments</p>
               <div className="text-4xl font-bold mb-1">$49</div>
               <p className="text-blue-100 mb-8">per month, billed annually</p>
-              <Link href="/auth/signup" className="block w-full py-3 bg-white text-blue-600 rounded-lg font-semibold text-center hover:bg-blue-50 transition-colors mb-8">
+              <Link href="/auth/login" className="block w-full py-3 bg-white text-blue-600 rounded-lg font-semibold text-center hover:bg-blue-50 transition-colors mb-8">
                 Start Free Trial
               </Link>
               <ul className="space-y-4">
@@ -506,7 +506,7 @@ export default function Home() {
             Join thousands of legal professionals who are already saving time and improving client outcomes with LegaLink360.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth/signup" className="inline-flex items-center justify-center px-10 py-4 bg-white text-blue-600 rounded-lg font-bold text-lg hover:bg-blue-50 transition-all hover:shadow-2xl">
+            <Link href="/auth/login" className="inline-flex items-center justify-center px-10 py-4 bg-white text-blue-600 rounded-lg font-bold text-lg hover:bg-blue-50 transition-all hover:shadow-2xl">
               Start Your Free Trial Now <ArrowRight className="ml-2 w-5 h-5" />
             </Link>
             <a href="mailto:support@legalink360.com" className="inline-flex items-center justify-center px-10 py-4 border-2 border-white text-white rounded-lg font-bold text-lg hover:bg-white/10 transition-all">

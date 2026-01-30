@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, Plus, Settings, LogOut, User, FolderPlus, Search, HelpCircle, Zap, Palette, ChevronLeft, ChevronRight } from "lucide-react";
+import { Menu, Plus, Settings, LogOut, User, FolderPlus, Search, HelpCircle, Zap, Palette, ChevronsLeft } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/lib/auth";
 import UserProfileSettings from "./UserProfileSettings";
@@ -78,7 +78,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
       {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 lg:hidden z-40"
+          className="fixed inset-0 bg-opacity-20 backdrop-blur-sm lg:hidden z-40"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -110,16 +110,16 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
             </div>
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="hidden lg:flex items-center justify-center cursor-pointer font-bold w-8 h-8 rounded-lg hover:bg-slate-700 transition-colors flex-shrink-0"
+              className="hidden lg:flex items-center justify-center cursor-pointer w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 transition-colors flex-shrink-0"
               title={isOpen ? "Collapse" : "Expand"}
             >
-              {isOpen ? <ChevronLeft size={18} className="font-bold"/> : <ChevronRight size={18} className="font-bold"/>}
+              <ChevronsLeft size={20} className={`text-slate-200 transition-transform ${!isOpen ? 'rotate-180' : ''}`}/>
             </button>
             <button
               onClick={() => setIsOpen(false)}
-              className="lg:hidden flex items-center cursor-pointer justify-center w-8 h-8 font-bold rounded-lg hover:bg-slate-700 transition-colors flex-shrink-0"
+              className="lg:hidden flex items-center cursor-pointer justify-center w-10 h-10 rounded-xl bg-slate-700 hover:bg-slate-600 border border-slate-600 transition-colors flex-shrink-0"
             >
-              {isOpen ? <ChevronLeft size={18} className="font-bold"/> : <ChevronRight size={18} className="font-bold"/>}
+              <ChevronsLeft size={20} className="text-slate-200"/>
             </button>
           </div>
 
@@ -344,7 +344,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="lg:hidden fixed bottom-6 right-6 z-40 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
+          className="hidden lg:hidden fixed bottom-6 right-6 z-40 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-colors"
         >
           <Menu size={24} />
         </button>

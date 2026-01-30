@@ -1,9 +1,12 @@
 "use client";
 
-import { Bell} from "lucide-react";
+import { useState } from "react";
+import { Bell } from "lucide-react";
+import NotificationsPage from "./NotificationsPage";
 
 
 export default function Header() {
+  const [showNotifications, setShowNotifications] = useState(false);
   return (
     <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-6 sticky top-0 z-30">
       {/* Left - Empty (Sidebar on the left takes this space) */}
@@ -17,11 +20,20 @@ export default function Header() {
         </div>
       {/* Right - Icons */}
       <div className="flex items-center gap-4">
-        <button className="cursor-pointer relative p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+        <button 
+          onClick={() => setShowNotifications(true)}
+          className="cursor-pointer relative p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+        >
           <Bell size={24} />
           <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
         </button>
       </div>
+
+      {/* Notifications Modal */}
+      <NotificationsPage 
+        isOpen={showNotifications} 
+        onClose={() => setShowNotifications(false)} 
+      />
     </header>
   );
 }
