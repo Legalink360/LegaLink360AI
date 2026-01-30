@@ -37,9 +37,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
 
     const initAuth = async () => {
       try {
+        // Set a maximum timeout to prevent infinite loading
+        timeoutId = setTimeout(() => {
+          if (isMounted) {
+            console.warn('⚠️ Auth initialization timeout - forcing loading to false');
+            setLoading(false);
+          }
+        }, 10000); // 10 second max timeout
+
         // Step 1: Try to get current user (with retry on first attempt)
         let currentUser = await getCurrentUser();
         
@@ -53,21 +62,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isMounted) {
           setUser(currentUser);
           
-          // Step 3: Load profile in background if user exists
+          // Step 3: Load profile in background if user exists (non-blocking)
           if (currentUser) {
-            const profile = await loadUserProfile(currentUser.id);
-            if (isMounted && profile) {
-              setUser(prev => prev ? { ...prev, ...profile } : null);
-            }
+            // Don't await - let it load in background
+            loadUserProfile(currentUser.id).then(profile => {
+              if (isMounted && profile) {
+                setUser(prev => prev ? { ...prev, ...profile } : null);
+              }
+            }).catch(err => {
+              console.error('Profile load error (non-blocking):', err);
+            });
           }
           
-          // Step 4: Set loading to false only when we have a definitive answer
+          // Step 4: Set loading to false immediately after auth check
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
           setLoading(false);
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
         if (isMounted) {
           setUser(null);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
           setLoading(false);
         }
       }
@@ -75,12 +96,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initAuth();
 
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+
     // Set up auth state listener with background profile loading
     const unsubscribe = onAuthStateChange(
       (updatedUser: AuthUser | null) => {
         if (isMounted) {
           setUser(updatedUser);
-          setLoading(false);
+          // Only set loading to false if we're not already initialized
+          // This prevents race conditions during navigation
+          setLoading(prev => prev ? false : prev);
         }
       },
       (profile) => {
@@ -93,6 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       if (unsubscribe) {
         unsubscribe();
       }

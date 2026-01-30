@@ -176,8 +176,18 @@ export default function ChatArea({
       }
 
       if (isMountedRef.current) {
+        // Only set initializing if we don't have a current secret
+        // and it's not already initializing
         if (!currentSecret) {
-          setIsInitializingSession(true);
+          setIsInitializingSession((prev) => {
+            if (prev === false) {
+              if (isDev) {
+                console.debug("[ChatArea] Starting session initialization");
+              }
+              return true;
+            }
+            return prev;
+          });
         }
         setErrorState({ session: null, integration: null, retryable: false });
       }
@@ -236,6 +246,9 @@ export default function ChatArea({
 
         if (isMountedRef.current) {
           setErrorState({ session: null, integration: null });
+          if (isDev) {
+            console.debug("[ChatArea] Session initialized successfully");
+          }
         }
 
         return clientSecret;
@@ -250,8 +263,11 @@ export default function ChatArea({
         }
         throw error instanceof Error ? error : new Error(detail);
       } finally {
-        if (isMountedRef.current && !currentSecret) {
+        if (isMountedRef.current) {
           setIsInitializingSession(false);
+          if (isDev) {
+            console.debug("[ChatArea] Session initialization complete (finally block)");
+          }
         }
       }
     },
@@ -447,6 +463,8 @@ Visit **[www.legalink360.com](https://www.legalink360.com)** to connect with our
       scriptStatus,
       hasError: Boolean(blockingError),
       workflowId: WORKFLOW_ID,
+      sessionError: errors.session,
+      integrationError: errors.integration,
     });
   }
 

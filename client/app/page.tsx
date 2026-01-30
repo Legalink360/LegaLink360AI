@@ -44,40 +44,71 @@ export default function Home() {
       if (loading) {
         console.error('⚠️ Auth initialization timeout - page still loading after 5 seconds');
         setLoadingTimeout(true);
+        // Force stop loading after 10 seconds total
+        setTimeout(() => {
+          if (loading) {
+            console.error('⚠️ Force stopping loading state after 10 seconds');
+            // This will be handled by the useAuth hook timeout, but we log it here too
+          }
+        }, 5000);
       }
     }, 5000);
 
     return () => clearTimeout(timeout);
   }, [loading]);
 
-  // Show chat app if authenticated
-  if (isAuthenticated && !loading) {
-    return <App />;
-  }
-
-  // Show loading state
-  if (loading) {
+  // Show loading state with timeout handling
+  if (loading && !loadingTimeout) {
     return (
       <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-slate-600 dark:text-slate-400">Loading...</p>
-          {loadingTimeout && (
-            <div className="mt-6">
-              <p className="text-red-600 dark:text-red-400 text-sm font-medium mb-4">
-                Taking longer than expected...
-              </p>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                Refresh Page
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );
+  }
+
+  // Show timeout message if loading takes too long
+  if (loadingTimeout) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 dark:text-red-400 text-lg font-medium mb-4">
+            ⚠️ Loading is taking longer than expected
+          </div>
+          <p className="text-slate-600 dark:text-slate-400 mb-6">
+            There may be an issue with authentication. Please try refreshing the page.
+          </p>
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Refresh Page
+            </button>
+            <button
+              onClick={() => {
+                // Clear local storage and reload
+                if (typeof window !== 'undefined') {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  window.location.href = '/';
+                }
+              }}
+              className="px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Clear Data & Reload
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show chat app if authenticated
+  if (isAuthenticated && !loading) {
+    return <App />;
   }
 
   // Show landing page if not authenticated

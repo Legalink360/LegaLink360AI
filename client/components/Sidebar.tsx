@@ -63,7 +63,14 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
     },
     { label: "New Project", icon: FolderPlus, href: "#" },
     { label: "Search chats", icon: Search, href: "#" },
-    { label: "Learn More", icon: HelpCircle, href: "/" },
+    { 
+      label: "Learn More", 
+      icon: HelpCircle, 
+      onClick: () => {
+        // Use router.push for client-side navigation to avoid full page reload
+        router.push('/');
+      }
+    },
   ];
 
   return (
@@ -135,14 +142,14 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                     <span>{link.label}</span>
                   </button>
                 ) : (
-                  <a
+                  <Link
                     key={idx}
-                    href={link.href}
+                    href={link.href || "#"}
                     className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
                   >
                     <Icon size={18} />
                     <span>{link.label}</span>
-                  </a>
+                  </Link>
                 );
               })}
             </nav>
@@ -153,15 +160,28 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
             <nav className="space-y-2 mt-4">
               {navLinks.map((link, idx) => {
                 const Icon = link.icon;
-                return (
-                  <a
+                const isClickable = link.onClick !== undefined;
+                return isClickable ? (
+                  <button
                     key={idx}
-                    href={link.href}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      link.onClick?.();
+                    }}
+                    className="flex items-center justify-center px-2 py-2.5 rounded-lg hover:bg-slate-700 transition-colors w-full"
+                    title={link.label}
+                  >
+                    <Icon size={18} />
+                  </button>
+                ) : (
+                  <Link
+                    key={idx}
+                    href={link.href || "#"}
                     className="flex items-center justify-center px-2 py-2.5 rounded-lg hover:bg-slate-700 transition-colors"
                     title={link.label}
                   >
                     <Icon size={18} />
-                  </a>
+                  </Link>
                 );
               })}
             </nav>

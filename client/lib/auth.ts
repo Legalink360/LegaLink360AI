@@ -196,16 +196,32 @@ export async function signOut(): Promise<AuthResponse> {
  * ISSUE 1.1 FIX: Removed blocking profile fetch - now returns auth user immediately
  * ISSUE #1 ANALYSIS FIX: Use session.user instead of getUser() to avoid race condition
  * Profile data is loaded asynchronously in background via loadUserProfile()
+ * ISSUE FIX: Added timeout and better error handling for session checks
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => {
+        console.warn('⚠️ getCurrentUser timeout');
+        resolve(null);
+      }, 5000);
+    });
+
     // Get session first to ensure we have valid auth state
+    const sessionPromise = getSupabaseClient().auth.getSession();
+    
     const {
       data: { session },
       error: sessionError,
-    } = await getSupabaseClient().auth.getSession();
+    } = await Promise.race([sessionPromise, timeoutPromise]) as any;
 
-    if (sessionError || !session) {
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      return null;
+    }
+
+    if (!session) {
       return null;
     }
 
@@ -222,7 +238,8 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       emailVerified: !!user.email_confirmed_at,
       createdAt: new Date(user.created_at || ''),
     };
-  } catch {
+  } catch (error) {
+    console.error('Error in getCurrentUser:', error);
     return null;
   }
 }
@@ -231,39 +248,60 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  * Load user profile data asynchronously (background)
  * ISSUE 1.1 FIX: Separated from getCurrentUser to prevent blocking login
  * ISSUE 1.2 FIX: Improved error handling with retry logic for RLS issues
+ * ISSUE FIX: Added timeout and better RLS error handling
  */
 export async function loadUserProfile(userId: string): Promise<Partial<AuthUser> | null> {
   try {
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => {
+        console.warn('⚠️ loadUserProfile timeout');
+        resolve(null);
+      }, 8000);
+    });
+
     // Step 1: Check session
+    const sessionPromise = getSupabaseClient().auth.getSession();
     const {
       data: { session },
       error: sessionError,
-    } = await getSupabaseClient().auth.getSession();
+    } = await Promise.race([sessionPromise, timeoutPromise]) as any;
 
     if (sessionError || !session) {
       console.error('❌ No active session when trying to load profile');
       return null;
     }
 
-    // Step 2: Get current user from auth
+    // Step 2: Get current user from auth (with timeout)
+    const getUserPromise = getSupabaseClient().auth.getUser();
     const {
       data: { user: authUser },
       error: authError,
-    } = await getSupabaseClient().auth.getUser();
+    } = await Promise.race([getUserPromise, timeoutPromise]) as any;
 
     if (authError || !authUser) {
       console.error('❌ No auth user');
       return null;
     }
 
-    // Step 3: Try to fetch profile
-    const { data: profiles, error: profileError } = await getSupabaseClient()
+    // Step 3: Try to fetch profile (with timeout)
+    const profileQueryPromise = getSupabaseClient()
       .from('user_profiles')
       .select('first_name, last_name, auth_id, email, job_title, company, phone')
       .eq('auth_id', userId);
 
+    const { data: profiles, error: profileError } = await Promise.race([
+      profileQueryPromise,
+      timeoutPromise.then(() => ({ data: null, error: { message: 'Timeout' } }))
+    ]) as any;
+
     if (profileError) {
-      console.error('❌ Profile query error:', profileError);
+      // Check if it's an RLS error
+      if (profileError.message?.includes('row-level security') || profileError.code === '42501') {
+        console.warn('⚠️ RLS policy may be blocking profile access. This might be expected if profile doesn\'t exist yet.');
+      } else {
+        console.error('❌ Profile query error:', profileError);
+      }
       return null;
     }
 
@@ -271,20 +309,29 @@ export async function loadUserProfile(userId: string): Promise<Partial<AuthUser>
     if (!profiles || profiles.length === 0) {
       console.log('Creating profile on first login for user:', userId);
       
-      const { error: insertError } = await getSupabaseClient()
-        .from('user_profiles')
-        .insert({
-          auth_id: userId,
-          email: session.user?.email || '',
-          first_name: '',
-          last_name: '',
-          email_verified: !!session.user?.email_confirmed_at,
-        });
+      try {
+        const { error: insertError } = await getSupabaseClient()
+          .from('user_profiles')
+          .insert({
+            auth_id: userId,
+            email: session.user?.email || '',
+            first_name: '',
+            last_name: '',
+            email_verified: !!session.user?.email_confirmed_at,
+          });
 
-      if (insertError) {
-        console.error('Failed to create profile:', insertError);
-      } else {
-        console.log('✅ Profile created on login');
+        if (insertError) {
+          // Check if it's an RLS error
+          if (insertError.message?.includes('row-level security') || insertError.code === '42501') {
+            console.warn('⚠️ RLS policy blocking profile creation. User may need to complete profile setup manually.');
+          } else {
+            console.error('Failed to create profile:', insertError);
+          }
+        } else {
+          console.log('✅ Profile created on login');
+        }
+      } catch (insertErr) {
+        console.error('Error creating profile:', insertErr);
       }
       return null;
     }
