@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
@@ -12,8 +12,24 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Load saved credentials on component mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedEmail = localStorage.getItem('legalink_remember_email');
+      const savedPassword = localStorage.getItem('legalink_remember_password');
+      const isRemembered = localStorage.getItem('legalink_remember_me') === 'true';
+      
+      if (savedEmail && savedPassword && isRemembered) {
+        setEmail(savedEmail);
+        setPassword(savedPassword);
+        setRememberMe(true);
+      }
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +55,18 @@ export default function LoginPage() {
         setError(response.message);
         setLoading(false);
         return;
+      }
+
+      // Save credentials if "Remember me" is checked
+      if (rememberMe) {
+        localStorage.setItem('legalink_remember_email', email);
+        localStorage.setItem('legalink_remember_password', password);
+        localStorage.setItem('legalink_remember_me', 'true');
+      } else {
+        // Clear saved credentials if "Remember me" is unchecked
+        localStorage.removeItem('legalink_remember_email');
+        localStorage.removeItem('legalink_remember_password');
+        localStorage.removeItem('legalink_remember_me');
       }
 
       // Redirect to home or dashboard
@@ -128,9 +156,11 @@ export default function LoginPage() {
 
             {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between">
-              <label className="flex items-center text-sm">
+              <label className="flex items-center text-sm cursor-pointer">
                 <input
                   type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="ml-2 text-slate-700 dark:text-slate-300">

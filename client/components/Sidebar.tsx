@@ -35,6 +35,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
   const [showHelp, setShowHelp] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showPersonalization, setShowPersonalization] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Close user menu when clicking outside
@@ -68,8 +69,8 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
       label: "Learn More", 
       icon: HelpCircle, 
       onClick: () => {
-        // Use router.push for client-side navigation to avoid full page reload
-        router.push('/');
+        // Navigate to home page with landing view parameter
+        router.push('/?view=landing');
       }
     },
   ];
@@ -294,7 +295,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                       <span>Help & Support</span>
                     </button>
                     <Link
-                      href="/"
+                      href="/?view=landing"
                       onClick={() => setShowUserMenu(false)}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
                     >
@@ -303,18 +304,25 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                     </Link>
                     <button
                       onClick={async () => {
+                        setIsSigningOut(true);
                         try {
                           await signOut();
                           setShowUserMenu(false);
+                          // Ensure auth state is properly cleared
                           router.push('/auth/login');
                         } catch (err) {
                           console.error('Sign out failed:', err);
+                          // Still redirect even if there's an error (session may be cleared)
+                          router.push('/auth/login');
+                        } finally {
+                          setIsSigningOut(false);
                         }
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-red-400 hover:text-red-300"
+                      disabled={isSigningOut}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-red-400 hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <LogOut size={16} />
-                      <span>Sign Out</span>
+                      <span>{isSigningOut ? 'Signing out...' : 'Sign Out'}</span>
                     </button>
                   </div>
                 )}

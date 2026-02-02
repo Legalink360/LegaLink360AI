@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import App from './App';
 import Link from 'next/link';
@@ -19,11 +20,14 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-export default function Home() {
+function HomeContent() {
   const { isAuthenticated, loading } = useAuth();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
+  
+  // Check if user wants to view landing page
+  const viewLanding = searchParams.get('view') === 'landing';
 
   const handleNewsletterSignup = (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,32 +37,8 @@ export default function Home() {
     setTimeout(() => setIsSubmitted(false), 5000);
   };
 
-  // Timeout for loading state (should not take more than 5 seconds)
-  useEffect(() => {
-    if (!loading) {
-      setLoadingTimeout(false);
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      if (loading) {
-        console.error('⚠️ Auth initialization timeout - page still loading after 5 seconds');
-        setLoadingTimeout(true);
-        // Force stop loading after 10 seconds total
-        setTimeout(() => {
-          if (loading) {
-            console.error('⚠️ Force stopping loading state after 10 seconds');
-            // This will be handled by the useAuth hook timeout, but we log it here too
-          }
-        }, 5000);
-      }
-    }, 5000);
-
-    return () => clearTimeout(timeout);
-  }, [loading]);
-
-  // Show loading state with timeout handling
-  if (loading && !loadingTimeout) {
+  // Show loading state
+  if (loading) {
     return (
       <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center">
         <div className="text-center">
@@ -69,49 +49,12 @@ export default function Home() {
     );
   }
 
-  // Show timeout message if loading takes too long
-  if (loadingTimeout) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-red-600 dark:text-red-400 text-lg font-medium mb-4">
-            ⚠️ Loading is taking longer than expected
-          </div>
-          <p className="text-slate-600 dark:text-slate-400 mb-6">
-            There may be an issue with authentication. Please try refreshing the page.
-          </p>
-          <div className="flex gap-4 justify-center">
-            <button
-              onClick={() => window.location.reload()}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              Refresh Page
-            </button>
-            <button
-              onClick={() => {
-                // Clear local storage and reload
-                if (typeof window !== 'undefined') {
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  window.location.href = '/';
-                }
-              }}
-              className="px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors"
-            >
-              Clear Data & Reload
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show chat app if authenticated
-  if (isAuthenticated && !loading) {
+  // Show chat app if authenticated and not viewing landing page
+  if (isAuthenticated && !viewLanding) {
     return <App />;
   }
 
-  // Show landing page if not authenticated
+  // Show landing page if not authenticated OR if viewing landing page
   return (
     <>
       {/* Navigation */}
@@ -554,5 +497,19 @@ export default function Home() {
         </div>
       </footer>
     </>
+  );
+}
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Loading...</p>
+        </div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }

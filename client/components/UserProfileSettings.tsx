@@ -32,6 +32,9 @@ export default function UserProfileSettings({ isOpen, onClose }: UserProfileSett
         firstName: user.firstName || "",
         lastName: user.lastName || "",
         email: user.email || "",
+        jobTitle: user.jobTitle || "",
+        company: user.company || "",
+        phone: user.phone || "",
       }));
     }
   }, [user]);
