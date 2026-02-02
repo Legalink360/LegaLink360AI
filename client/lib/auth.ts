@@ -40,6 +40,9 @@ export interface AuthUser {
   email: string;
   firstName?: string;
   lastName?: string;
+  jobTitle?: string;
+  company?: string;
+  phone?: string;
   emailVerified: boolean;
   createdAt: Date;
 }
@@ -167,16 +170,37 @@ export async function signInWithEmail(
 
 /**
  * Sign out
+ * IMPROVED: Added timeout protection and better error handling
  */
 export async function signOut(): Promise<AuthResponse> {
   try {
-    const { error } = await getSupabaseClient().auth.signOut();
+    // Add timeout to prevent hanging
+    const signOutPromise = getSupabaseClient().auth.signOut();
+    
+    const timeoutPromise = new Promise<{ error: Error }>((resolve) => {
+      setTimeout(() => {
+        resolve({ error: new Error('Sign out timeout - took too long') });
+      }, 8000);
+    });
+
+    const { error } = await Promise.race([signOutPromise, timeoutPromise]) as any;
 
     if (error) {
+      console.error('Sign out error:', error);
       return {
         success: false,
-        message: error.message,
+        message: error.message || 'Failed to sign out',
       };
+    }
+
+    // Clear any cached data
+    if (typeof window !== 'undefined') {
+      // Don't clear all localStorage - just clear session-specific items
+      try {
+        sessionStorage.clear();
+      } catch (e) {
+        console.warn('Could not clear sessionStorage:', e);
+      }
     }
 
     return {
@@ -184,6 +208,7 @@ export async function signOut(): Promise<AuthResponse> {
       message: 'Logged out successfully',
     };
   } catch (error) {
+    console.error('Sign out exception:', error);
     return {
       success: false,
       message: error instanceof Error ? error.message : 'Logout failed',
@@ -201,20 +226,25 @@ export async function signOut(): Promise<AuthResponse> {
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
     // Add timeout to prevent hanging
-    const timeoutPromise = new Promise<null>((resolve) => {
+    const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) => {
       setTimeout(() => {
         console.warn('⚠️ getCurrentUser timeout');
-        resolve(null);
+        resolve({ data: { session: null } });
       }, 5000);
     });
 
     // Get session first to ensure we have valid auth state
     const sessionPromise = getSupabaseClient().auth.getSession();
     
-    const {
-      data: { session },
-      error: sessionError,
-    } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+    const result = await Promise.race([sessionPromise, timeoutPromise]);
+    
+    const { data, error: sessionError } = result as any;
+    
+    if (!data) {
+      return null;
+    }
+
+    const { session } = data;
 
     if (sessionError) {
       console.error('Session error:', sessionError);
@@ -341,6 +371,9 @@ export async function loadUserProfile(userId: string): Promise<Partial<AuthUser>
     return {
       firstName: profile.first_name,
       lastName: profile.last_name,
+      jobTitle: profile.job_title,
+      company: profile.company,
+      phone: profile.phone,
     };
   } catch (error) {
     console.error('❌ Error loading user profile:', error instanceof Error ? error.message : error);
@@ -549,6 +582,9 @@ export async function refreshUserProfile(): Promise<AuthUser | null> {
       ...user,
       firstName: profile?.firstName,
       lastName: profile?.lastName,
+      jobTitle: profile?.jobTitle,
+      company: profile?.company,
+      phone: profile?.phone,
     };
   } catch (error) {
     console.error('Error refreshing user profile:', error);

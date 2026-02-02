@@ -1,0 +1,198 @@
+-- =============================================================================
+-- COMPLETE MIGRATION SUITE - SUPABASE DATABASE SETUP
+-- For: LegaLink360AI - Fresh Database Setup
+-- Date: February 2026
+-- =============================================================================
+-- 
+-- This script runs ALL migrations in the correct order to set up your
+-- complete Supabase database from scratch.
+--
+-- IMPORTANT: Run these migrations in Supabase SQL Editor in order!
+--
+-- =============================================================================
+
+-- Step 1: Import each migration in order
+-- Copy and paste each migration file into Supabase SQL Editor and run
+
+-- MIGRATION 001: User Profiles
+-- File: 001_create_user_profiles_v2.sql
+-- Purpose: Create user profile management table
+-- Status: PENDING - Run this first
+
+-- MIGRATION 002: Documents
+-- File: 002_create_documents_v2.sql
+-- Purpose: Create user document storage table
+-- Status: PENDING - Run after migration 001
+
+-- MIGRATION 003: Chat Threads
+-- File: 003_create_chat_threads_v2.sql
+-- Purpose: Create chat conversation management table
+-- Status: PENDING - Run after migration 001
+
+-- MIGRATION 004: Chat Messages
+-- File: 004_create_chat_messages_v2.sql
+-- Purpose: Create chat message storage table
+-- Status: PENDING - Run after migration 003
+
+-- MIGRATION 005: Backend Documents
+-- File: 005_create_backend_documents_v2.sql
+-- Purpose: Create backend document metadata table
+-- Status: PENDING - Run after migration 001
+
+-- MIGRATION 006: Document Chunks
+-- File: 006_create_document_chunks_v2.sql
+-- Purpose: Create vector embedding chunks table
+-- Status: PENDING - Run after migration 005
+
+-- MIGRATION 007: Ingestion Logs
+-- File: 007_create_ingestion_logs_v2.sql
+-- Purpose: Create document ingestion audit logs
+-- Status: PENDING - Run after migration 005
+
+-- MIGRATION 008: Query Logs
+-- File: 008_create_query_logs_v2.sql
+-- Purpose: Create RAG query tracking and monitoring
+-- Status: PENDING - Run after migration 001 and 003
+
+-- MIGRATION 009: User Preferences
+-- File: 009_create_user_preferences_v2.sql
+-- Purpose: Create user settings and preferences
+-- Status: PENDING - Run after migration 001
+
+-- MIGRATION 010: Document Sharing
+-- File: 010_create_document_sharing_v2.sql
+-- Purpose: Create document sharing and collaboration
+-- Status: PENDING - Run after migration 002
+
+-- MIGRATION 011: Audit Logs
+-- File: 011_create_audit_logs_v2.sql
+-- Purpose: Create system audit trail for compliance
+-- Status: PENDING - Run last
+
+-- =============================================================================
+-- EXECUTION ORDER (IMPORTANT!)
+-- =============================================================================
+-- 1. 001_create_user_profiles_v2.sql (depends on: auth.users)
+-- 2. 002_create_documents_v2.sql (depends on: auth.users)
+-- 3. 003_create_chat_threads_v2.sql (depends on: auth.users)
+-- 4. 004_create_chat_messages_v2.sql (depends on: 003_chat_threads)
+-- 5. 005_create_backend_documents_v2.sql (no dependencies)
+-- 6. 006_create_document_chunks_v2.sql (depends on: 005_backend_documents)
+-- 7. 007_create_ingestion_logs_v2.sql (depends on: 005_backend_documents)
+-- 8. 008_create_query_logs_v2.sql (depends on: 001_user_profiles, 003_chat_threads)
+-- 9. 009_create_user_preferences_v2.sql (depends on: auth.users)
+-- 10. 010_create_document_sharing_v2.sql (depends on: 002_documents)
+-- 11. 011_create_audit_logs_v2.sql (no dependencies)
+--
+-- =============================================================================
+-- MANUAL SETUP INSTRUCTIONS
+-- =============================================================================
+--
+-- 1. Go to Supabase Dashboard
+-- 2. Select your project
+-- 3. Go to SQL Editor
+-- 4. For EACH migration file (001 through 011):
+--    a. Open the migration file
+--    b. Copy all SQL code
+--    c. Paste into SQL Editor
+--    d. Click "Run" button
+--    e. Wait for "Migration XXX Applied" message
+--    f. Move to next migration
+--
+-- 5. After all migrations are complete:
+--    - Check "Tables" section to verify all tables exist
+--    - Check "Policies" section to verify RLS policies are applied
+--    - Check "Indexes" section to verify indexes are created
+--
+-- =============================================================================
+-- TABLE SUMMARY
+-- =============================================================================
+--
+-- Frontend (User-facing):
+--   - user_profiles: User profile information
+--   - documents: User-uploaded documents
+--   - chat_threads: Chat conversation threads
+--   - chat_messages: Individual chat messages
+--   - document_shares: Document sharing/collaboration
+--   - user_preferences: User settings
+--
+-- Backend (System):
+--   - backend_documents: Document metadata for indexing
+--   - document_chunks: Vector embedding chunks
+--   - ingestion_logs: Document processing audit trail
+--   - query_logs: RAG query tracking
+--
+-- Security & Compliance:
+--   - audit_logs: System audit trail
+--
+-- =============================================================================
+-- VERIFICATION CHECKLIST
+-- =============================================================================
+--
+-- After running all migrations, verify:
+-- [ ] 11 tables created
+-- [ ] All RLS policies enabled
+-- [ ] All indexes created
+-- [ ] No errors in migration logs
+-- [ ] Can query each table successfully
+-- [ ] User authentication working
+--
+-- Test queries to run:
+-- 1. SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';
+--    Expected: 11 (or more if you have other tables)
+--
+-- 2. SELECT tablename FROM pg_tables WHERE schemaname = 'public';
+--    Expected: Lists all 11 tables
+--
+-- 3. SELECT * FROM information_schema.role_based_access_control_privileges;
+--    To verify RLS is enabled on all tables
+--
+-- =============================================================================
+-- ROLLBACK INSTRUCTIONS (If needed)
+-- =============================================================================
+--
+-- To drop a table and start over:
+-- DROP TABLE IF EXISTS public.table_name CASCADE;
+--
+-- To drop all tables (CAUTION - removes all data):
+-- DROP TABLE IF EXISTS public.audit_logs;
+-- DROP TABLE IF EXISTS public.document_shares;
+-- DROP TABLE IF EXISTS public.user_preferences;
+-- DROP TABLE IF EXISTS public.query_logs;
+-- DROP TABLE IF EXISTS public.ingestion_logs;
+-- DROP TABLE IF EXISTS public.document_chunks;
+-- DROP TABLE IF EXISTS public.backend_documents;
+-- DROP TABLE IF EXISTS public.chat_messages;
+-- DROP TABLE IF EXISTS public.chat_threads;
+-- DROP TABLE IF EXISTS public.documents;
+-- DROP TABLE IF EXISTS public.user_profiles;
+--
+-- =============================================================================
+-- NEXT STEPS AFTER MIGRATIONS
+-- =============================================================================
+--
+-- 1. Configure Supabase environment variables in your client:
+--    - NEXT_PUBLIC_SUPABASE_URL
+--    - NEXT_PUBLIC_SUPABASE_ANON_KEY
+--
+-- 2. Update backend environment variables:
+--    - SUPABASE_URL
+--    - SUPABASE_SERVICE_KEY (for backend operations)
+--
+-- 3. Test authentication:
+--    - Sign up a new user
+--    - Verify email confirmation
+--    - Log in
+--    - Check user_profiles table for new user
+--
+-- 4. Test document upload:
+--    - Upload a document
+--    - Verify entry in documents table
+--    - Check RLS policies allow user to see their own document
+--
+-- 5. Test chat functionality:
+--    - Create a chat thread
+--    - Add chat messages
+--    - Verify entries in chat_threads and chat_messages tables
+--
+-- =============================================================================
