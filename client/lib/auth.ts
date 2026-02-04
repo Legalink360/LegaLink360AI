@@ -310,8 +310,8 @@ export async function refreshSession(): Promise<boolean> {
  * IMPROVEMENT: Silently refreshes tokens every 50 minutes (before 1-hour expiry)
  * This ensures users stay logged in without interruption
  */
-export function setupAutoTokenRefresh() {
-  if (typeof window === 'undefined') return; // Only in browser
+export function setupAutoTokenRefresh(): NodeJS.Timeout | null {
+  if (typeof window === 'undefined') return null; // Only in browser
   
   // Refresh token every 50 minutes (before the 1-hour session expiry)
   const refreshInterval = setInterval(async () => {
