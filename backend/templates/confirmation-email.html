@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Your LegaLink360 Account</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                sans-serif;
+            background-color: #f9fafb;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            padding: 40px 20px;
+            text-align: center;
+            color: white;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            letter-spacing: -0.5px;
+        }
+
+        .logo span {
+            color: #3b82f6;
+        }
+
+        .tagline {
+            font-size: 14px;
+            color: #cbd5e1;
+            margin-top: 5px;
+        }
+
+        /* Main Content */
+        .content {
+            padding: 40px;
+        }
+
+        .greeting {
+            font-size: 20px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 20px;
+        }
+
+        .description {
+            font-size: 15px;
+            color: #4b5563;
+            margin-bottom: 30px;
+            line-height: 1.8;
+        }
+
+        .cta-container {
+            text-align: center;
+            margin: 40px 0;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 14px 40px;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+        }
+
+        .alternative-link {
+            font-size: 13px;
+            color: #4b5563;
+            margin-top: 20px;
+        }
+
+        .alternative-link a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .alternative-link a:hover {
+            text-decoration: underline;
+        }
+
+        /* Security Notice */
+        .security-notice {
+            background-color: #f0fdf4;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            margin: 30px 0;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #065f46;
+        }
+
+        .security-icon {
+            margin-right: 8px;
+            font-weight: bold;
+        }
+
+        /* Features Section */
+        .features {
+            background-color: #f8fafc;
+            padding: 30px;
+            margin: 30px 0;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .features-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 20px;
+        }
+
+        .feature-item {
+            display: flex;
+            margin-bottom: 15px;
+            align-items: flex-start;
+        }
+
+        .feature-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .feature-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            flex-shrink: 0;
+            line-height: 1.4;
+        }
+
+        .feature-text {
+            font-size: 14px;
+            color: #4b5563;
+            line-height: 1.6;
+        }
+
+        .feature-text strong {
+            color: #0f172a;
+        }
+
+        /* Support Links */
+        .support-section {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 30px;
+            margin-top: 30px;
+        }
+
+        .support-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 15px;
+        }
+
+        .support-links {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .support-link {
+            text-decoration: none;
+            color: #3b82f6;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 10px;
+            background-color: #f8fafc;
+            border-radius: 4px;
+            text-align: center;
+            transition: background-color 0.2s;
+        }
+
+        .support-link:hover {
+            background-color: #eff6ff;
+            text-decoration: underline;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: #f8fafc;
+            padding: 30px;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+            font-size: 13px;
+            color: #64748b;
+        }
+
+        .footer-content {
+            margin-bottom: 15px;
+        }
+
+        .social-links {
+            margin: 15px 0;
+        }
+
+        .social-link {
+            display: inline-block;
+            margin: 0 10px;
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .social-link:hover {
+            text-decoration: underline;
+        }
+
+        .footer-bottom {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+            margin-top: 15px;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+
+        .footer-bottom a {
+            color: #3b82f6;
+            text-decoration: none;
+        }
+
+        .footer-bottom a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .email-container {
+                border-radius: 0;
+            }
+
+            .header {
+                padding: 30px 15px;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .support-links {
+                grid-template-columns: 1fr;
+            }
+
+            .cta-button {
+                display: block;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">Lega<span>Link</span>360</div>
+            <div class="tagline">AI-Powered Legal Intelligence Platform</div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content">
+            <div class="greeting">Welcome to LegaLink360! 👋</div>
+
+            <div class="description">
+                Thank you for signing up for LegaLink360, your AI-powered legal assistant. 
+                We're excited to have you on board! To get started, please confirm your email 
+                address by clicking the button below.
+            </div>
+
+            <!-- CTA Button -->
+            <div class="cta-container">
+                <a href="{{ .ConfirmationURL }}" class="cta-button">Confirm Your Email</a>
+                <div class="alternative-link">
+                    Or copy and paste this link:<br>
+                    <a href="{{ .ConfirmationURL }}">{{ .ConfirmationURL }}</a>
+                </div>
+            </div>
+
+            <!-- Security Notice -->
+            <div class="security-notice">
+                <span class="security-icon">🔒</span>
+                <strong>Security:</strong> This link will expire in 24 hours for your protection. 
+                If you didn't sign up for this account, you can safely ignore this email.
+            </div>
+
+            <!-- Features Section -->
+            <div class="features">
+                <div class="features-title">What You Can Do With LegaLink360:</div>
+                <div class="feature-item">
+                    <div class="feature-icon">⚖️</div>
+                    <div class="feature-text">
+                        <strong>Legal Research:</strong> Access comprehensive Uganda and African laws
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🤖</div>
+                    <div class="feature-text">
+                        <strong>AI Assistant:</strong> Get instant legal guidance from our AI expert
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">📋</div>
+                    <div class="feature-text">
+                        <strong>Document Analysis:</strong> Upload and analyze legal documents
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">💼</div>
+                    <div class="feature-text">
+                        <strong>Template Library:</strong> Access ready-to-use legal templates
+                    </div>
+                </div>
+            </div>
+
+            <!-- Support Section -->
+            <div class="support-section">
+                <div class="support-title">Need Help?</div>
+                <div class="support-links">
+                    <a href="https://www.legalink360.com/help" class="support-link">Help Center</a>
+                    <a href="https://www.legalink360.com/contact" class="support-link">Contact Us</a>
+                    <a href="https://www.legalink360.com/faq" class="support-link">FAQ</a>
+                    <a href="https://www.legalink360.com/docs" class="support-link">Documentation</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-content">
+                <strong>LegaLink360</strong><br>
+                Your AI-Powered Legal Intelligence Platform
+            </div>
+
+            <div class="social-links">
+                <a href="https://twitter.com/legalink360" class="social-link">Twitter</a>
+                <a href="https://linkedin.com/company/legalink360" class="social-link">LinkedIn</a>
+                <a href="https://www.legalink360.com" class="social-link">Website</a>
+            </div>
+
+            <div class="footer-bottom">
+                <div style="margin-bottom: 10px;">
+                    © 2026 LegaLink360. All rights reserved.
+                </div>
+                <div>
+                    <a href="https://www.legalink360.com/privacy">Privacy Policy</a> | 
+                    <a href="https://www.legalink360.com/terms">Terms of Service</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
