@@ -33,6 +33,7 @@ try {
 const allowedOrigins: string[] = [
   'http://localhost:3000',
   'http://localhost:3001',
+  'https://legalink360ai.vercel.app',
   process.env.CLIENT_URL || '',
 ].filter((origin): origin is string => Boolean(origin));
 
