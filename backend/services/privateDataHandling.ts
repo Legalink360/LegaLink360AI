@@ -402,7 +402,7 @@ Always cite your sources.`,
         role: 'user',
         content: `Legal Documents (for reference):
 
-${sources.rows.map(s => `${s.title}:\n${s.content}`).join('\n\n')}
+${sources.rows.map((s: any) => `${s.title}:\n${s.content}`).join('\n\n')}
 
 User Question: ${sanitized.sanitized}`,
       },

@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { RetrievalService } from './services/retrievalService';
 import { LLMService } from './services/llmService';
+import { ChatThreadService } from './services/chatThreadService';
 
 // Load environment variables only in development
 if (process.env.NODE_ENV !== 'production') {
@@ -13,22 +14,32 @@ const app = express();
 const PORT = process.env.PORT || process.env.APP_PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Initialize services
-const retrievalService = new RetrievalService();
-const llmService = new LLMService();
+// Initialize services with error handling
+let retrievalService: any;
+let llmService: any;
+let chatThreadService: any;
+
+try {
+  retrievalService = new RetrievalService();
+  llmService = new LLMService();
+  chatThreadService = new ChatThreadService();
+} catch (error) {
+  console.warn('[Server] Warning initializing services:', (error as any).message);
+  // Services are optional for chat thread functionality
+}
 
 // Middleware
 // CORS configuration - specify allowed origins for production
-const allowedOrigins = [
+const allowedOrigins: string[] = [
   'http://localhost:3000',
   'http://localhost:3001',
-  process.env.CLIENT_URL, // Production client URL from env
-].filter(Boolean);
+  process.env.CLIENT_URL || '',
+].filter((origin): origin is string => Boolean(origin));
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? allowedOrigins 
-    : true, // Allow all in development
+    : '*', // Allow all in development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -93,7 +104,7 @@ app.post('/api/retrieve', async (req: Request, res: Response) => {
       query: query,
       resultsCount: results.length,
       elapsedTime: `${elapsedTime}ms`,
-      results: results.map((r, i) => ({
+      results: results.map((r: any, i: number) => ({
         rank: i + 1,
         id: r.id,
         title: r.title,
@@ -157,7 +168,7 @@ app.post('/api/query', async (req: Request, res: Response) => {
     const answer = await llmService.generateAnswer(query, documents);
 
     // Step 3: Format response with sources
-    const sources = documents.map((doc, i) => ({
+    const sources = documents.map((doc: any, i: number) => ({
       rank: i + 1,
       id: doc.id,
       title: doc.title,
@@ -244,7 +255,7 @@ app.post('/api/query/stream', async (req: Request, res: Response) => {
     }
 
     // Send sources at the end
-    const sources = documents.map((doc, i) => ({
+    const sources = documents.map((doc: any, i: number) => ({
       rank: i + 1,
       title: doc.title,
       category: doc.category,
@@ -267,6 +278,247 @@ app.post('/api/query/stream', async (req: Request, res: Response) => {
     console.error(`❌ Stream error: ${error.message}\n`);
     res.status(500).json({
       error: 'Streaming failed',
+      message: error.message,
+    });
+  }
+});
+
+// ============================================================================
+// CHAT THREADS API
+// ============================================================================
+
+// Middleware to extract and validate user ID from auth header
+const extractUserId = (req: Request): string | null => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    console.log('[Auth] No Bearer token found');
+    return null;
+  }
+  
+  // Extract user ID from the JWT token (it's in the 'sub' claim)
+  try {
+    const token = authHeader.substring(7);
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.log('[Auth] Invalid token format');
+      return null;
+    }
+    
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    console.log('[Auth] Extracted user ID:', payload.sub);
+    return payload.sub || null;
+  } catch (error) {
+    console.error('[Auth] Error extracting user ID:', error);
+    return null;
+  }
+};
+
+/**
+ * GET /api/chat/threads
+ * Get all chat threads for the authenticated user
+ */
+app.get('/api/chat/threads', async (req: Request, res: Response) => {
+  try {
+    const userId = extractUserId(req);
+    console.log('[GET /api/chat/threads] User ID:', userId);
+    
+    if (!userId) {
+      console.log('[GET /api/chat/threads] Unauthorized - no user ID');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const threads = await chatThreadService.getUserChatThreads(userId);
+    console.log('[GET /api/chat/threads] Found threads:', threads.length);
+    
+    res.json({
+      success: true,
+      threads,
+      count: threads.length,
+    });
+  } catch (error: any) {
+    console.error('[GET /api/chat/threads] Error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch chat threads',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/chat/threads
+ * Create a new chat thread
+ */
+app.post('/api/chat/threads', async (req: Request, res: Response) => {
+  try {
+    const userId = extractUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { title = 'New Chat', topic, documentIds } = req.body;
+
+    const thread = await chatThreadService.createChatThread(userId, title, topic, documentIds);
+    if (!thread) {
+      return res.status(500).json({ error: 'Failed to create chat thread' });
+    }
+
+    res.status(201).json({
+      success: true,
+      thread,
+    });
+  } catch (error: any) {
+    console.error('Error creating chat thread:', error);
+    res.status(500).json({
+      error: 'Failed to create chat thread',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/chat/threads/:threadId
+ * Get a specific chat thread
+ */
+app.get('/api/chat/threads/:threadId', async (req: Request, res: Response) => {
+  try {
+    const userId = extractUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { threadId } = req.params;
+    const thread = await chatThreadService.getChatThread(threadId, userId);
+    
+    if (!thread) {
+      return res.status(404).json({ error: 'Thread not found' });
+    }
+
+    res.json({
+      success: true,
+      thread,
+    });
+  } catch (error: any) {
+    console.error('Error fetching chat thread:', error);
+    res.status(500).json({
+      error: 'Failed to fetch chat thread',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/chat/threads/:threadId
+ * Update a chat thread
+ */
+app.put('/api/chat/threads/:threadId', async (req: Request, res: Response) => {
+  try {
+    const userId = extractUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { threadId } = req.params;
+    const updates = req.body;
+
+    const thread = await chatThreadService.updateChatThread(threadId, userId, updates);
+    if (!thread) {
+      return res.status(404).json({ error: 'Thread not found or update failed' });
+    }
+
+    res.json({
+      success: true,
+      thread,
+    });
+  } catch (error: any) {
+    console.error('Error updating chat thread:', error);
+    res.status(500).json({
+      error: 'Failed to update chat thread',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/chat/threads/:threadId/archive
+ * Archive a chat thread
+ */
+app.post('/api/chat/threads/:threadId/archive', async (req: Request, res: Response) => {
+  try {
+    const userId = extractUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { threadId } = req.params;
+    const success = await chatThreadService.archiveThread(threadId, userId);
+
+    if (!success) {
+      return res.status(404).json({ error: 'Thread not found' });
+    }
+
+    res.json({ success: true, message: 'Thread archived' });
+  } catch (error: any) {
+    console.error('Error archiving thread:', error);
+    res.status(500).json({
+      error: 'Failed to archive thread',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/chat/threads/:threadId
+ * Delete a chat thread
+ */
+app.delete('/api/chat/threads/:threadId', async (req: Request, res: Response) => {
+  try {
+    const userId = extractUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { threadId } = req.params;
+    const success = await chatThreadService.deleteThread(threadId, userId);
+
+    if (!success) {
+      return res.status(404).json({ error: 'Thread not found' });
+    }
+
+    res.json({ success: true, message: 'Thread deleted' });
+  } catch (error: any) {
+    console.error('Error deleting thread:', error);
+    res.status(500).json({
+      error: 'Failed to delete thread',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/chat/threads/:threadId/pin
+ * Pin or unpin a thread
+ */
+app.post('/api/chat/threads/:threadId/pin', async (req: Request, res: Response) => {
+  try {
+    const userId = extractUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { threadId } = req.params;
+    const { isPinned } = req.body;
+
+    const success = await chatThreadService.togglePinThread(threadId, userId, isPinned);
+
+    if (!success) {
+      return res.status(404).json({ error: 'Thread not found' });
+    }
+
+    res.json({ success: true, message: isPinned ? 'Thread pinned' : 'Thread unpinned' });
+  } catch (error: any) {
+    console.error('Error toggling pin:', error);
+    res.status(500).json({
+      error: 'Failed to toggle pin',
       message: error.message,
     });
   }
@@ -310,7 +562,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 // ============================================================================
 // START SERVER
 // ============================================================================
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n${'═'.repeat(70)}`);
   console.log('🚀 LEGALINK360 BACKEND SERVER');
   console.log(`${'═'.repeat(70)}`);
@@ -327,4 +579,19 @@ app.listen(PORT, () => {
   console.log(`   • Supabase URL: ${process.env.SUPABASE_URL ? '✓ Configured' : '✗ NOT SET'}`);
   console.log(`\n✅ Server ready to accept requests`);
   console.log(`${'═'.repeat(70)}\n`);
+});
+
+// ============================================================================
+// GLOBAL ERROR HANDLERS
+// ============================================================================
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('[Server] Uncaught Exception:', error);
+  // Log but don't exit - allow server to keep running
 });

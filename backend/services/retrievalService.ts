@@ -18,17 +18,22 @@ export class RetrievalService {
   private indexName: string;
 
   constructor() {
-    this.pinecone = new Pinecone({
-      apiKey: process.env.PINECONE_API_KEY!,
-    });
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY!,
-    });
-    this.supabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_KEY!
-    );
-    this.indexName = process.env.PINECONE_INDEX_NAME!;
+    try {
+      this.pinecone = new Pinecone({
+        apiKey: process.env.PINECONE_API_KEY!,
+      });
+      this.openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY!,
+      });
+      this.supabase = createClient(
+        process.env.SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_KEY!
+      );
+      this.indexName = process.env.PINECONE_INDEX_NAME!;
+    } catch (error) {
+      console.error('[RetrievalService] Error initializing:', (error as any).message);
+      throw error;
+    }
   }
 
   /**
@@ -87,11 +92,11 @@ export class RetrievalService {
           if (!error && data) {
             results.push({
               id: match.id,
-              title: match.metadata?.title || 'Unknown',
+              title: String(match.metadata?.title || 'Unknown'),
               content: data.content,
               relevanceScore: match.score || 0,
-              category: match.metadata?.category || 'Unknown',
-              chunkIndex: match.metadata?.chunkIndex || 0,
+              category: String(match.metadata?.category || 'Unknown'),
+              chunkIndex: Number(match.metadata?.chunkIndex || 0),
             });
           }
         } catch (err) {
