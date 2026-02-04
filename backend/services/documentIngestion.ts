@@ -11,18 +11,20 @@
 
 import { Pinecone } from '@pinecone-database/pinecone';
 import { OpenAI } from 'openai';
-import * as pdfParse from 'pdf-parse';
+// @ts-ignore - pdf-parse doesn't have proper TypeScript definitions
+import pdfParse from 'pdf-parse';
 import * as fs from 'fs';
 import * as path from 'path';
+// @ts-ignore - uuid doesn't have proper TypeScript definitions in all versions
 import { v4 as uuidv4 } from 'uuid';
 
 // Initialize clients
 const pinecone = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY,
+  apiKey: process.env.PINECONE_API_KEY || '',
 });
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || '',
 });
 
 // Types

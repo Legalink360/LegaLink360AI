@@ -15,7 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 // Lazy-load Supabase client to avoid errors during build
 let supabase: any = null;
 
-function getSupabaseClient() {
+export function getSupabaseClient() {
   if (supabase) {
     return supabase;
   }

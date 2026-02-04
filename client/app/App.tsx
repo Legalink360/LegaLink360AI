@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { type FactAction } from "@/components/ChatArea";
 import { type ChatThread } from "@/components/Sidebar";
 import { useColorScheme } from "@/hooks/useColorScheme";
+import { useAuth } from "@/hooks/useAuth";
+import { chatThreadApi } from "@/lib/chatThreadApi";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import ChatArea from "@/components/ChatArea";
@@ -25,88 +27,50 @@ function formatDate(date: Date): string {
 
 export default function App() {
   const { scheme, setScheme } = useColorScheme();
+  const { isAuthenticated } = useAuth();
   const [chatHistory, setChatHistory] = useState<ChatThread[]>([]);
   const [chatKitControl, setChatKitControl] = useState<any>(null);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
 
-  // Fetch real chat history from ChatKit when control is ready
-  const fetchChatHistory = useCallback(async (control: any) => {
-    try {
-      if (process.env.NODE_ENV !== "production") {
-        console.debug("[App] Fetching chat history from ChatKit");
-      }
-
-      // Try to get threads from ChatKit API
-      if (control && typeof control.getThreads === "function") {
-        try {
-          const threads = await control.getThreads();
-          if (threads && Array.isArray(threads)) {
-            const formattedHistory = threads.map((thread: any) => ({
-              id: thread.id,
-              title: thread.title || "Untitled Chat",
-              date: thread.created_at ? formatDate(new Date(thread.created_at)) : "Unknown",
-            }));
-            setChatHistory(formattedHistory);
-            if (process.env.NODE_ENV !== "production") {
-              console.debug("[App] Chat history loaded from getThreads:", formattedHistory);
-            }
-            return;
-          }
-        } catch (apiError) {
-          if (process.env.NODE_ENV !== "production") {
-            console.debug("[App] getThreads() failed, trying fallback:", apiError);
-          }
-        }
-      }
-
-      // Fallback: Check for stored threads in ChatKit's thread list
-      if (control && control.threadList) {
-        const threads = control.threadList;
-        if (Array.isArray(threads) && threads.length > 0) {
-          const formattedHistory = threads.map((thread: any) => ({
-            id: thread.id,
-            title: thread.title || "Untitled Chat",
-            date: thread.date || formatDate(new Date()),
-          }));
-          setChatHistory(formattedHistory);
-          if (process.env.NODE_ENV !== "production") {
-            console.debug("[App] Chat history from threadList:", formattedHistory);
-          }
-          return;
-        }
-      }
-
-      // Fallback: Check ChatKit's internal structure
-      if (control && control._threads) {
-        const threads = control._threads;
-        if (Array.isArray(threads) && threads.length > 0) {
-          const formattedHistory = threads.map((thread: any) => ({
-            id: thread.id,
-            title: thread.title || "Untitled Chat",
-            date: thread.date || formatDate(new Date()),
-          }));
-          setChatHistory(formattedHistory);
-          if (process.env.NODE_ENV !== "production") {
-            console.debug("[App] Chat history from _threads:", formattedHistory);
-          }
-          return;
-        }
-      }
-
-      // No threads found
-      if (process.env.NODE_ENV !== "production") {
-        console.debug("[App] No chat history found in any location", {
-          hasGetThreads: typeof control?.getThreads === "function",
-          hasThreadList: !!control?.threadList,
-          has_threads: !!control?._threads,
-        });
-      }
+  // Fetch chat history from database
+  const fetchChatHistory = useCallback(async () => {
+    if (!isAuthenticated) {
+      console.log("[App] Not authenticated, clearing history");
       setChatHistory([]);
+      return;
+    }
+
+    try {
+      console.log("[App] Fetching chat history from database...");
+      const threads = await chatThreadApi.getThreads();
+      
+      console.log("[App] Received threads from API:", threads);
+      
+      const formattedHistory = threads.map((thread) => ({
+        id: thread.id,
+        title: thread.title || "Untitled Chat",
+        date: thread.last_message_at 
+          ? formatDate(new Date(thread.last_message_at)) 
+          : formatDate(new Date(thread.created_at)),
+      }));
+      
+      console.log("[App] Formatted history:", formattedHistory);
+      setChatHistory(formattedHistory);
+      
     } catch (error) {
       console.error("[App] Error fetching chat history:", error);
       setChatHistory([]);
     }
-  }, []);
+  }, [isAuthenticated]);
+
+  // Fetch chat history when authenticated
+  useEffect(() => {
+    console.log("[App] useEffect triggered - isAuthenticated:", isAuthenticated);
+    if (isAuthenticated) {
+      console.log("[App] User authenticated, fetching chat history...");
+      fetchChatHistory();
+    }
+  }, [isAuthenticated, fetchChatHistory]);
 
   const handleWidgetAction = useCallback(async (action: FactAction) => {
     if (process.env.NODE_ENV !== "production") {
@@ -126,23 +90,18 @@ export default function App() {
       return;
     }
     try {
-      // Call setThreadId directly on the element
-      if (typeof chatKitControl.setThreadId === "function") {
-        await chatKitControl.setThreadId(null);
-        setCurrentThreadId(null);
-        // Refresh history after creating new chat
-        setTimeout(() => fetchChatHistory(chatKitControl), 500);
-      } else if (chatKitControl.control && typeof chatKitControl.control.setThreadId === "function") {
-        // Try nested control property
-        await chatKitControl.control.setThreadId(null);
-        setCurrentThreadId(null);
-        // Refresh history after creating new chat
-        setTimeout(() => fetchChatHistory(chatKitControl), 500);
-      } else {
-        console.error("[App] setThreadId method not found", {
-          element: chatKitControl.tagName,
-          methods: Object.getOwnPropertyNames(Object.getPrototypeOf(chatKitControl)).slice(0, 10),
-        });
+      // Create a new thread in the database
+      const newThread = await chatThreadApi.createThread("New Chat");
+      if (newThread) {
+        setCurrentThreadId(newThread.id);
+        // Set the thread in ChatKit
+        if (typeof chatKitControl.setThreadId === "function") {
+          await chatKitControl.setThreadId(newThread.id);
+        } else if (chatKitControl.control?.setThreadId) {
+          await chatKitControl.control.setThreadId(newThread.id);
+        }
+        // Refresh history
+        await fetchChatHistory();
       }
     } catch (error) {
       console.error("[App] Error creating new chat", error);
@@ -156,66 +115,81 @@ export default function App() {
         return;
       }
       try {
-        // Call setThreadId directly on the element
+        setCurrentThreadId(threadId);
+        // Set the thread in ChatKit
         if (typeof chatKitControl.setThreadId === "function") {
           await chatKitControl.setThreadId(threadId);
-          setCurrentThreadId(threadId);
-          // Refresh history after selecting chat
-          setTimeout(() => fetchChatHistory(chatKitControl), 500);
-        } else if (chatKitControl.control && typeof chatKitControl.control.setThreadId === "function") {
-          // Try nested control property
+        } else if (chatKitControl.control?.setThreadId) {
           await chatKitControl.control.setThreadId(threadId);
-          setCurrentThreadId(threadId);
-          // Refresh history after selecting chat
-          setTimeout(() => fetchChatHistory(chatKitControl), 500);
-        } else {
-          console.error("[App] setThreadId method not found");
         }
       } catch (error) {
         console.error("[App] Error selecting chat", error);
       }
     },
-    [chatKitControl, fetchChatHistory]
+    [chatKitControl]
   );
 
   const handleThreadChange = useCallback((threadId: string | null) => {
     setCurrentThreadId(threadId);
-  }, []);
+    // Refresh history when thread changes
+    fetchChatHistory();
+  }, [fetchChatHistory]);
 
   const handleChatKitReady = useCallback((element: any) => {
-    if (process.env.NODE_ENV !== "production") {
-      console.debug("[App] ChatKit ready, element:", {
-        tagName: element?.tagName,
-        hasSetThreadId: typeof element?.setThreadId === "function",
-        hasGetThreads: typeof element?.getThreads === "function",
-      });
-    }
+    console.log("[App] ChatKit ready");
     setChatKitControl(element);
     
-    // Fetch real chat history from ChatKit
-    fetchChatHistory(element);
-    
-    // Listen for thread changes and refresh history
-    if (element && element.addEventListener) {
-      const handleThreadChange = () => {
-        if (process.env.NODE_ENV !== "production") {
-          console.debug("[App] Thread changed, refreshing history");
-        }
-        fetchChatHistory(element);
-      };
-
-      element.addEventListener("chatkit.thread-change", handleThreadChange);
-      element.addEventListener("chatkit.thread-created", handleThreadChange);
-      element.addEventListener("chatkit.thread-deleted", handleThreadChange);
-
-      // Cleanup listeners
-      return () => {
-        element.removeEventListener("chatkit.thread-change", handleThreadChange);
-        element.removeEventListener("chatkit.thread-created", handleThreadChange);
-        element.removeEventListener("chatkit.thread-deleted", handleThreadChange);
-      };
+    // Fetch chat history for the sidebar
+    if (isAuthenticated) {
+      console.log("[App] ChatKit ready, fetching chat history...");
+      fetchChatHistory();
     }
-  }, [fetchChatHistory]);
+
+    // Try to extract threads from ChatKit and sync them
+    if (element) {
+      // Run async operations in a separate function to avoid await in non-async callback
+      const syncThreads = async () => {
+        try {
+          console.log("[App] Attempting to extract threads from ChatKit...");
+          
+          // Try different ways to access threads from ChatKit
+          let threads: any[] = [];
+          
+          if (typeof element.getThreads === "function") {
+            threads = await element.getThreads();
+            console.log("[App] Got threads from getThreads():", threads);
+          } else if (element.threadList && Array.isArray(element.threadList)) {
+            threads = element.threadList;
+            console.log("[App] Got threads from threadList:", threads);
+          } else if (element._threads && Array.isArray(element._threads)) {
+            threads = element._threads;
+            console.log("[App] Got threads from _threads:", threads);
+          }
+
+          // Sync threads to database
+          if (threads.length > 0) {
+            console.log("[App] Found", threads.length, "threads in ChatKit, syncing to database...");
+            for (const thread of threads) {
+              try {
+                const threadTitle = thread.title || thread.name || "Untitled Chat";
+                console.log("[App] Creating/syncing thread:", threadTitle);
+                await chatThreadApi.createThread(threadTitle);
+              } catch (error) {
+                console.error("[App] Error syncing thread:", error);
+              }
+            }
+            // Refresh sidebar after syncing
+            await fetchChatHistory();
+          }
+        } catch (error) {
+          console.error("[App] Error extracting/syncing threads:", error);
+        }
+      };
+      
+      // Call the async function without awaiting in the callback
+      syncThreads();
+    }
+  }, [isAuthenticated, fetchChatHistory]);
 
   return (
     <div className="flex h-screen bg-white dark:bg-slate-950">
@@ -247,3 +221,4 @@ export default function App() {
     </div>
   );
 }
+

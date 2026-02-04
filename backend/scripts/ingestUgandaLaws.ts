@@ -8,9 +8,10 @@
  * Usage: npm run ingest-uganda-laws
  */
 
+// @ts-ignore - uuid doesn't have proper TypeScript definitions in all versions
+import { v4 as uuidv4 } from 'uuid';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '../.env.local') });
@@ -22,11 +23,11 @@ import { UGANDA_LAWS_CHUNKS, UGANDA_LAWS_METADATA } from '../data/ugandanLawsDat
 
 // Initialize clients
 const pinecone = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY,
+  apiKey: process.env.PINECONE_API_KEY || '',
 });
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || '',
 });
 
 const supabase = createClient(
