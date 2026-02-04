@@ -14,7 +14,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import { AuthUser, getCurrentUser, onAuthStateChange, refreshUserProfile, loadUserProfile } from '@/lib/auth';
+import { AuthUser, getCurrentUser, onAuthStateChange, refreshUserProfile, loadUserProfile, setupAutoTokenRefresh } from '@/lib/auth';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -47,16 +47,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
     let timeoutId: NodeJS.Timeout | null = null;
     let unsubscribe: (() => void) | null = null;
+    let refreshIntervalId: NodeJS.Timeout | null = null;
 
     const initAuth = async () => {
       try {
-        // Set a maximum timeout (5 seconds instead of 10)
+        // Set a maximum timeout (15 seconds - increased to handle slower connections)
         timeoutId = setTimeout(() => {
           if (isMounted && loading) {
-            console.warn('⚠️ Auth initialization timeout (5s) - forcing loading to false');
+            console.warn('⚠️ Auth initialization timeout (15s) - forcing loading to false');
             setLoading(false);
           }
-        }, 5000);
+        }, 15000);
 
         // Step 1: Try to get current user
         let currentUser = await getCurrentUser();
@@ -81,6 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .catch(err => {
                 console.error('Profile load error (non-blocking):', err);
               });
+            
+            // IMPROVEMENT: Set up automatic silent token refresh (every 50 minutes)
+            refreshIntervalId = setupAutoTokenRefresh();
+            console.log('✅ Auto-refresh enabled - tokens will refresh silently every 50 minutes');
           }
           
           // Step 4: Set loading to false
@@ -126,6 +131,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       if (timeoutId) {
         clearTimeout(timeoutId);
+      }
+      if (refreshIntervalId) {
+        clearInterval(refreshIntervalId);
       }
       if (unsubscribe) {
         unsubscribe();

@@ -27,7 +27,15 @@ export function getSupabaseClient() {
     throw new Error('Missing Supabase environment variables');
   }
 
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
+  // IMPROVED: Enable auto-refresh and persistent sessions for seamless experience
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,           // Keep session in localStorage
+      autoRefreshToken: true,         // Auto-refresh tokens before expiry
+      detectSessionInUrl: true,       // Detect session from URL on callback
+    },
+  });
+  
   return supabase;
 }
 
@@ -225,12 +233,12 @@ export async function signOut(): Promise<AuthResponse> {
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
-    // Add timeout to prevent hanging
+    // Add timeout to prevent hanging (increased to 20s to avoid false logouts on slow connections)
     const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) => {
       setTimeout(() => {
-        console.warn('⚠️ getCurrentUser timeout');
+        console.warn('⚠️ getCurrentUser timeout after 20s - this might indicate slow server response, not actual logout');
         resolve({ data: { session: null } });
-      }, 5000);
+      }, 20000);
     });
 
     // Get session first to ensure we have valid auth state
@@ -272,6 +280,52 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     console.error('Error in getCurrentUser:', error);
     return null;
   }
+}
+
+/**
+ * Refresh session token
+ * AUTOLOGOUT FIX: Prevent logout due to expired session
+ * Automatically refreshes the session if it's expired or about to expire
+ * IMPROVED: Now with automatic background refresh every 50 minutes
+ */
+export async function refreshSession(): Promise<boolean> {
+  try {
+    const { data, error } = await getSupabaseClient().auth.refreshSession();
+    
+    if (error || !data.session) {
+      console.warn('⚠️ Failed to refresh session:', error?.message);
+      return false;
+    }
+    
+    console.log('✅ Session refreshed successfully');
+    return true;
+  } catch (error) {
+    console.error('Error refreshing session:', error);
+    return false;
+  }
+}
+
+/**
+ * Set up automatic silent token refresh
+ * IMPROVEMENT: Silently refreshes tokens every 50 minutes (before 1-hour expiry)
+ * This ensures users stay logged in without interruption
+ */
+export function setupAutoTokenRefresh() {
+  if (typeof window === 'undefined') return; // Only in browser
+  
+  // Refresh token every 50 minutes (before the 1-hour session expiry)
+  const refreshInterval = setInterval(async () => {
+    try {
+      const success = await refreshSession();
+      if (!success) {
+        console.warn('⚠️ Background token refresh failed - will retry on next interval');
+      }
+    } catch (error) {
+      console.error('Error in auto-refresh:', error);
+    }
+  }, 50 * 60 * 1000); // 50 minutes
+  
+  return refreshInterval;
 }
 
 /**
