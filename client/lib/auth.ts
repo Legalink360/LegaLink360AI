@@ -11,6 +11,8 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { SESSION_CONFIG } from './sessionConfig';
+import { sessionCache } from './sessionCache';
 
 // Lazy-load Supabase client to avoid errors during build
 let supabase: any = null;
@@ -35,6 +37,11 @@ export function getSupabaseClient() {
       detectSessionInUrl: true,       // Detect session from URL on callback
     },
   });
+
+  // Set up activity-based token refresh for 7-day sessions
+  if (typeof window !== 'undefined') {
+    setupActivityBasedRefresh();
+  }
   
   return supabase;
 }
@@ -229,16 +236,16 @@ export async function signOut(): Promise<AuthResponse> {
  * ISSUE 1.1 FIX: Removed blocking profile fetch - now returns auth user immediately
  * ISSUE #1 ANALYSIS FIX: Use session.user instead of getUser() to avoid race condition
  * Profile data is loaded asynchronously in background via loadUserProfile()
- * ISSUE FIX: Added timeout and better error handling for session checks
+ * 7-DAY SESSION FIX: Added retry logic, increased timeout, and caching
  */
-export async function getCurrentUser(): Promise<AuthUser | null> {
+export async function getCurrentUser(retryCount = 0): Promise<AuthUser | null> {
   try {
-    // Add timeout to prevent hanging (increased to 20s to avoid false logouts on slow connections)
+    // Add timeout to prevent hanging (using config value: 30s)
     const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) => {
       setTimeout(() => {
-        console.warn('⚠️ getCurrentUser timeout after 20s - this might indicate slow server response, not actual logout');
+        console.warn('⚠️ getCurrentUser timeout after ' + SESSION_CONFIG.timeouts.GET_CURRENT_USER / 1000 + 's');
         resolve({ data: { session: null } });
-      }, 20000);
+      }, SESSION_CONFIG.timeouts.GET_CURRENT_USER);
     });
 
     // Get session first to ensure we have valid auth state
@@ -249,6 +256,25 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const { data, error: sessionError } = result as any;
     
     if (!data) {
+      // Timeout occurred - try cache before retrying
+      const cachedSession = sessionCache.getSession();
+      if (cachedSession) {
+        console.log('✅ Using cached session due to timeout');
+        return {
+          id: cachedSession.user.id,
+          email: cachedSession.user.email,
+          emailVerified: true,
+          createdAt: new Date(),
+        };
+      }
+      
+      // Retry logic
+      if (retryCount < SESSION_CONFIG.onTimeout.MAX_RETRIES && SESSION_CONFIG.onTimeout.RETRY) {
+        console.log(`🔄 Retrying getCurrentUser (${retryCount + 1}/${SESSION_CONFIG.onTimeout.MAX_RETRIES})`);
+        await new Promise(resolve => setTimeout(resolve, SESSION_CONFIG.onTimeout.RETRY_DELAY));
+        return getCurrentUser(retryCount + 1);
+      }
+      
       return null;
     }
 
@@ -256,6 +282,14 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     if (sessionError) {
       console.error('Session error:', sessionError);
+      
+      // Retry on error
+      if (retryCount < SESSION_CONFIG.onTimeout.MAX_RETRIES && SESSION_CONFIG.onTimeout.RETRY) {
+        console.log(`🔄 Retrying getCurrentUser after error (${retryCount + 1}/${SESSION_CONFIG.onTimeout.MAX_RETRIES})`);
+        await new Promise(resolve => setTimeout(resolve, SESSION_CONFIG.onTimeout.RETRY_DELAY));
+        return getCurrentUser(retryCount + 1);
+      }
+      
       return null;
     }
 
@@ -269,6 +303,14 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null;
     }
 
+    // Cache the user data for offline support
+    sessionCache.saveUserProfile({
+      id: user.id,
+      email: user.email || '',
+      name: user.user_metadata?.first_name,
+      savedAt: Date.now(),
+    });
+
     // Return auth user immediately (without profile to avoid blocking login)
     return {
       id: user.id,
@@ -278,6 +320,14 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     };
   } catch (error) {
     console.error('Error in getCurrentUser:', error);
+    
+    // Retry on exception
+    if (retryCount < SESSION_CONFIG.onTimeout.MAX_RETRIES && SESSION_CONFIG.onTimeout.RETRY) {
+      console.log(`🔄 Retrying getCurrentUser after exception (${retryCount + 1}/${SESSION_CONFIG.onTimeout.MAX_RETRIES})`);
+      await new Promise(resolve => setTimeout(resolve, SESSION_CONFIG.onTimeout.RETRY_DELAY));
+      return getCurrentUser(retryCount + 1);
+    }
+    
     return null;
   }
 }
@@ -286,7 +336,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  * Refresh session token
  * AUTOLOGOUT FIX: Prevent logout due to expired session
  * Automatically refreshes the session if it's expired or about to expire
- * IMPROVED: Now with automatic background refresh every 50 minutes
+ * IMPROVED: Now with caching and error event dispatch
  */
 export async function refreshSession(): Promise<boolean> {
   try {
@@ -294,38 +344,115 @@ export async function refreshSession(): Promise<boolean> {
     
     if (error || !data.session) {
       console.warn('⚠️ Failed to refresh session:', error?.message);
+      
+      // Dispatch event that refresh failed (so UI can show warning instead of logout)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('session:refresh-failed', {
+            detail: { error: error?.message || 'Unknown error' },
+          })
+        );
+      }
+      
       return false;
+    }
+    
+    // Cache the session after successful refresh
+    if (data.session) {
+      sessionCache.saveSession({
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token || '',
+        expiresAt: data.session.expires_at ? data.session.expires_at * 1000 : Date.now() + (7 * 24 * 60 * 60 * 1000),
+        user: {
+          id: data.session.user?.id || '',
+          email: data.session.user?.email || '',
+          name: data.session.user?.user_metadata?.first_name,
+        },
+        savedAt: Date.now(),
+      });
     }
     
     console.log('✅ Session refreshed successfully');
     return true;
   } catch (error) {
     console.error('Error refreshing session:', error);
+    
+    // Dispatch event on exception
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('session:refresh-failed', {
+          detail: { error: error instanceof Error ? error.message : 'Unknown error' },
+        })
+      );
+    }
+    
     return false;
   }
 }
 
 /**
  * Set up automatic silent token refresh
- * IMPROVEMENT: Silently refreshes tokens every 50 minutes (before 1-hour expiry)
+ * IMPROVEMENT: Silently refreshes tokens every 6 days (before 7-day expiry)
  * This ensures users stay logged in without interruption
  */
 export function setupAutoTokenRefresh(): NodeJS.Timeout | null {
   if (typeof window === 'undefined') return null; // Only in browser
   
-  // Refresh token every 50 minutes (before the 1-hour session expiry)
+  // Refresh token every 6 days (before the 7-day session expiry)
   const refreshInterval = setInterval(async () => {
     try {
       const success = await refreshSession();
       if (!success) {
         console.warn('⚠️ Background token refresh failed - will retry on next interval');
+      } else {
+        console.log('✅ Background token refresh succeeded');
       }
     } catch (error) {
       console.error('Error in auto-refresh:', error);
     }
-  }, 50 * 60 * 1000); // 50 minutes
+  }, SESSION_CONFIG.refresh.INTERVAL);
   
   return refreshInterval;
+}
+
+/**
+ * Set up activity-based token refresh
+ * Refreshes tokens when user is active and approaching token expiry
+ * This provides a better UX than interval-based refresh
+ */
+export function setupActivityBasedRefresh(): void {
+  if (typeof window === 'undefined') return; // Only in browser
+  if (!SESSION_CONFIG.refresh.ACTIVITY_BASED) return; // Only if enabled
+
+  // Track user activity
+  const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+  
+  const recordActivity = () => {
+    sessionCache.recordActivity();
+  };
+
+  // Add activity listeners
+  activityEvents.forEach((event) => {
+    window.addEventListener(event, recordActivity, { passive: true });
+  });
+
+  // Check if should refresh based on activity
+  const activityRefreshInterval = setInterval(async () => {
+    if (sessionCache.shouldRefreshBasedOnActivity()) {
+      const success = await refreshSession();
+      if (success) {
+        console.log('✅ Activity-based token refresh succeeded');
+      }
+    }
+  }, SESSION_CONFIG.refresh.DEBOUNCE_TIME);
+
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    activityEvents.forEach((event) => {
+      window.removeEventListener(event, recordActivity);
+    });
+    clearInterval(activityRefreshInterval);
+  });
 }
 
 /**

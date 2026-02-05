@@ -15,6 +15,8 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { AuthUser, getCurrentUser, onAuthStateChange, refreshUserProfile, loadUserProfile, setupAutoTokenRefresh } from '@/lib/auth';
+import { SESSION_CONFIG } from '@/lib/sessionConfig';
+import { sessionCache } from '@/lib/sessionCache';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -51,13 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const initAuth = async () => {
       try {
-        // Set a maximum timeout (15 seconds - increased to handle slower connections)
+        // Set a maximum timeout (using config value: 60 seconds instead of 15s)
         timeoutId = setTimeout(() => {
           if (isMounted && loading) {
-            console.warn('⚠️ Auth initialization timeout (15s) - forcing loading to false');
+            console.warn(`⚠️ Auth initialization timeout (${SESSION_CONFIG.timeouts.INIT_AUTH / 1000}s) - forcing loading to false`);
             setLoading(false);
           }
-        }, 15000);
+        }, SESSION_CONFIG.timeouts.INIT_AUTH);
 
         // Step 1: Try to get current user
         let currentUser = await getCurrentUser();
@@ -83,9 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 console.error('Profile load error (non-blocking):', err);
               });
             
-            // IMPROVEMENT: Set up automatic silent token refresh (every 50 minutes)
+            // IMPROVEMENT: Set up automatic silent token refresh (every 6 days)
             refreshIntervalId = setupAutoTokenRefresh();
-            console.log('✅ Auto-refresh enabled - tokens will refresh silently every 50 minutes');
+            console.log('✅ Auto-refresh enabled - tokens will refresh silently');
           }
           
           // Step 4: Set loading to false
@@ -110,6 +112,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Initialize auth immediately
     initAuth();
+
+    // Listen for session refresh failures (don't logout, just show warning)
+    const handleSessionRefreshFailed = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.warn('⚠️ Session refresh failed:', customEvent.detail?.error);
+      
+      // Show warning to user but DON'T logout
+      // (This prevents unexpected logouts on network issues)
+      if (SESSION_CONFIG.onTimeout.SHOW_WARNING) {
+        window.dispatchEvent(
+          new CustomEvent('notification:warning', {
+            detail: {
+              message: SESSION_CONFIG.messages.REFRESH_FAILED,
+              duration: 3000,
+            },
+          })
+        );
+      }
+    };
+
+    window.addEventListener('session:refresh-failed', handleSessionRefreshFailed);
 
     // Set up auth state listener with background profile loading
     unsubscribe = onAuthStateChange(
@@ -138,6 +161,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (unsubscribe) {
         unsubscribe();
       }
+      // Cleanup event listeners
+      window.removeEventListener('session:refresh-failed', handleSessionRefreshFailed);
     };
   }, []);
 
