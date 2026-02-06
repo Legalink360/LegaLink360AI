@@ -4,7 +4,7 @@
  * Provides offline support and faster startup by caching:
  * - Session tokens (access + refresh)
  * - User profile data
- * - Chat thread metadata
+
  * 
  * Strategy:
  * 1. On login: Save tokens and user data
