@@ -116,19 +116,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for session refresh failures (don't logout, just show warning)
     const handleSessionRefreshFailed = (event: Event) => {
       const customEvent = event as CustomEvent;
-      console.warn('⚠️ Session refresh failed:', customEvent.detail?.error);
-      
-      // Show warning to user but DON'T logout
-      // (This prevents unexpected logouts on network issues)
-      if (SESSION_CONFIG.onTimeout.SHOW_WARNING) {
-        window.dispatchEvent(
-          new CustomEvent('notification:warning', {
-            detail: {
-              message: SESSION_CONFIG.messages.REFRESH_FAILED,
-              duration: 3000,
-            },
-          })
-        );
+      // Only show warning for real failures, not aborts
+      const errorMsg = customEvent.detail?.error;
+      if (!errorMsg?.includes('aborted')) {
+        console.warn('⚠️ Session refresh failed:', errorMsg);
+        
+        // Show warning to user but DON'T logout
+        if (SESSION_CONFIG.onTimeout.SHOW_WARNING) {
+          window.dispatchEvent(
+            new CustomEvent('notification:warning', {
+              detail: {
+                message: SESSION_CONFIG.messages.REFRESH_FAILED,
+                duration: 3000,
+              },
+            })
+          );
+        }
       }
     };
 

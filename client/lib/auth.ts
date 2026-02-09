@@ -38,9 +38,11 @@ export function getSupabaseClient() {
     },
   });
 
-  // Set up activity-based token refresh for 7-day sessions
+  // Set up auto token refresh (50-minute interval)
+  // Note: Activity-based refresh disabled - it was causing race conditions
+  // Supabase auto-refresh + periodic 50-min refresh is sufficient
   if (typeof window !== 'undefined') {
-    setupActivityBasedRefresh();
+    // setupActivityBasedRefresh();  // DISABLED - was causing conflicts
   }
   
   return supabase;
@@ -135,10 +137,19 @@ export async function signInWithEmail(
   password: string
 ): Promise<AuthResponse> {
   try {
-    const { data, error } = await getSupabaseClient().auth.signInWithPassword({
+    // Add timeout for login (90 seconds - reasonable for auth)
+    const loginPromise = getSupabaseClient().auth.signInWithPassword({
       email,
       password,
     });
+    
+    const timeoutPromise = new Promise<any>((resolve) => {
+      setTimeout(() => {
+        resolve({ error: { message: 'Login request timed out. Please try again.' }, data: null });
+      }, 90000); // 90 seconds
+    });
+    
+    const { data, error } = await Promise.race([loginPromise, timeoutPromise]);
 
     if (error) {
       return {
@@ -240,26 +251,24 @@ export async function signOut(): Promise<AuthResponse> {
  */
 export async function getCurrentUser(retryCount = 0): Promise<AuthUser | null> {
   try {
-    // Add timeout to prevent hanging (using config value: 30s)
+    // Add reasonable timeout (45 seconds) but use cache instead of logging out on timeout
     const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) => {
       setTimeout(() => {
-        console.warn('⚠️ getCurrentUser timeout after ' + SESSION_CONFIG.timeouts.GET_CURRENT_USER / 1000 + 's');
+        console.debug('ℹ️ getCurrentUser taking longer than 45s - will use cache if available');
         resolve({ data: { session: null } });
-      }, SESSION_CONFIG.timeouts.GET_CURRENT_USER);
+      }, 45000); // 45 seconds
     });
 
-    // Get session first to ensure we have valid auth state
     const sessionPromise = getSupabaseClient().auth.getSession();
-    
     const result = await Promise.race([sessionPromise, timeoutPromise]);
     
     const { data, error: sessionError } = result as any;
     
-    if (!data) {
-      // Timeout occurred - try cache before retrying
+    if (!data || sessionError) {
+      // Timeout or error occurred - try cache first (don't logout!)
       const cachedSession = sessionCache.getSession();
       if (cachedSession) {
-        console.log('✅ Using cached session due to timeout');
+        console.log('✅ Using cached session (network timeout/error)');
         return {
           id: cachedSession.user.id,
           email: cachedSession.user.email,
@@ -268,32 +277,26 @@ export async function getCurrentUser(retryCount = 0): Promise<AuthUser | null> {
         };
       }
       
-      // Retry logic
-      if (retryCount < SESSION_CONFIG.onTimeout.MAX_RETRIES && SESSION_CONFIG.onTimeout.RETRY) {
-        console.log(`🔄 Retrying getCurrentUser (${retryCount + 1}/${SESSION_CONFIG.onTimeout.MAX_RETRIES})`);
-        await new Promise(resolve => setTimeout(resolve, SESSION_CONFIG.onTimeout.RETRY_DELAY));
-        return getCurrentUser(retryCount + 1);
+      if (sessionError) {
+        console.error('Session error:', sessionError);
       }
-      
       return null;
     }
 
     const { session } = data;
 
-    if (sessionError) {
-      console.error('Session error:', sessionError);
-      
-      // Retry on error
-      if (retryCount < SESSION_CONFIG.onTimeout.MAX_RETRIES && SESSION_CONFIG.onTimeout.RETRY) {
-        console.log(`🔄 Retrying getCurrentUser after error (${retryCount + 1}/${SESSION_CONFIG.onTimeout.MAX_RETRIES})`);
-        await new Promise(resolve => setTimeout(resolve, SESSION_CONFIG.onTimeout.RETRY_DELAY));
-        return getCurrentUser(retryCount + 1);
-      }
-      
-      return null;
-    }
-
     if (!session) {
+      // No session - try cache
+      const cachedSession = sessionCache.getSession();
+      if (cachedSession) {
+        console.log('✅ Using cached session (no active session)');
+        return {
+          id: cachedSession.user.id,
+          email: cachedSession.user.email,
+          emailVerified: true,
+          createdAt: new Date(),
+        };
+      }
       return null;
     }
 
@@ -321,11 +324,16 @@ export async function getCurrentUser(retryCount = 0): Promise<AuthUser | null> {
   } catch (error) {
     console.error('Error in getCurrentUser:', error);
     
-    // Retry on exception
-    if (retryCount < SESSION_CONFIG.onTimeout.MAX_RETRIES && SESSION_CONFIG.onTimeout.RETRY) {
-      console.log(`🔄 Retrying getCurrentUser after exception (${retryCount + 1}/${SESSION_CONFIG.onTimeout.MAX_RETRIES})`);
-      await new Promise(resolve => setTimeout(resolve, SESSION_CONFIG.onTimeout.RETRY_DELAY));
-      return getCurrentUser(retryCount + 1);
+    // Try cache on any exception
+    const cachedSession = sessionCache.getSession();
+    if (cachedSession) {
+      console.log('✅ Using cached session after error');
+      return {
+        id: cachedSession.user.id,
+        email: cachedSession.user.email,
+        emailVerified: true,
+        createdAt: new Date(),
+      };
     }
     
     return null;
@@ -335,25 +343,33 @@ export async function getCurrentUser(retryCount = 0): Promise<AuthUser | null> {
 /**
  * Refresh session token
  * AUTOLOGOUT FIX: Prevent logout due to expired session
- * Automatically refreshes the session if it's expired or about to expire
- * IMPROVED: Now with caching and error event dispatch
- */
+ * Automatically refreshes the session if it's expired or about to expire*/
 export async function refreshSession(): Promise<boolean> {
   try {
     const { data, error } = await getSupabaseClient().auth.refreshSession();
     
-    if (error || !data.session) {
+    if (error) {
+      // Check if it's an abort error (safe to ignore - request was cancelled optimally)
+      if (error.message?.includes('aborted') || error.name === 'AbortError') {
+        console.debug('ℹ️ Token refresh aborted (safe) - will retry on next interval');
+        return true; // Treat abort as success - it's not a real failure
+      }
+      
       console.warn('⚠️ Failed to refresh session:', error?.message);
       
-      // Dispatch event that refresh failed (so UI can show warning instead of logout)
+      // Dispatch event only on real errors, not aborts
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('session:refresh-failed', {
-            detail: { error: error?.message || 'Unknown error' },
+            detail: { error: error.message },
           })
         );
       }
-      
+      return false;
+    }
+    
+    if (!data.session) {
+      console.warn('⚠️ No session returned from refresh');
       return false;
     }
     
@@ -375,31 +391,36 @@ export async function refreshSession(): Promise<boolean> {
     console.log('✅ Session refreshed successfully');
     return true;
   } catch (error) {
-    console.error('Error refreshing session:', error);
-    
-    // Dispatch event on exception
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('session:refresh-failed', {
-          detail: { error: error instanceof Error ? error.message : 'Unknown error' },
-        })
-      );
+    // Check if it's an abort error (safe - request was optimally cancelled by Supabase)
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.debug('ℹ️ Token refresh request aborted (safe) - will retry later');
+      return true; // Don't treat as failure
     }
     
+    console.error('Error refreshing session:', error);
     return false;
   }
 }
 
 /**
  * Set up automatic silent token refresh
- * IMPROVEMENT: Silently refreshes tokens every 6 days (before 7-day expiry)
+ * IMPROVEMENT: Silently refreshes tokens every 50 minutes (before 7-day expiry)
  * This ensures users stay logged in without interruption
+ * FIXED: Prevents multiple intervals and handles abort errors gracefully
  */
+let globalRefreshIntervalId: NodeJS.Timeout | null = null;
+
 export function setupAutoTokenRefresh(): NodeJS.Timeout | null {
   if (typeof window === 'undefined') return null; // Only in browser
   
-  // Refresh token every 6 days (before the 7-day session expiry)
-  const refreshInterval = setInterval(async () => {
+  // Clear any existing interval first to prevent duplicates
+  if (globalRefreshIntervalId) {
+    clearInterval(globalRefreshIntervalId);
+    globalRefreshIntervalId = null;
+  }
+  
+  // Refresh token every 50 minutes (before the 7-day session expiry)
+  globalRefreshIntervalId = setInterval(async () => {
     try {
       const success = await refreshSession();
       if (!success) {
@@ -410,9 +431,9 @@ export function setupAutoTokenRefresh(): NodeJS.Timeout | null {
     } catch (error) {
       console.error('Error in auto-refresh:', error);
     }
-  }, SESSION_CONFIG.refresh.INTERVAL);
+  }, 50 * 60 * 1000); // 50 minutes
   
-  return refreshInterval;
+  return globalRefreshIntervalId;
 }
 
 /**
