@@ -6,6 +6,11 @@ import { AuthProvider } from "@/hooks/useAuth";
 export const metadata: Metadata = {
   title: "LegaLink360 AI",
   description: "Your intelligent legal assistant by LegaLink & Co. Advocates - providing accessible legal guidance and support.",
+  icons: {
+    icon: "/logo/LegaLink360.png", // Favicon
+    apple: "/logo/LegaLink360.png", // Apple touch icon
+  },
+  manifest: "/manifest.json",
   other: {
     "openai-domain-verification": process.env.NEXT_PUBLIC_OPENAI_DOMAIN_VERIFICATION || "",
   },
