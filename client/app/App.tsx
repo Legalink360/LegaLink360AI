@@ -35,16 +35,12 @@ export default function App() {
   // Fetch chat history from database
   const fetchChatHistory = useCallback(async () => {
     if (!isAuthenticated) {
-      console.log("[App] Not authenticated, clearing history");
       setChatHistory([]);
       return;
     }
 
     try {
-      console.log("[App] Fetching chat history from database...");
       const threads = await chatThreadApi.getThreads();
-      
-      console.log("[App] Received threads from API:", threads);
       
       const formattedHistory = threads.map((thread) => ({
         id: thread.id,
@@ -54,7 +50,6 @@ export default function App() {
           : formatDate(new Date(thread.created_at)),
       }));
       
-      console.log("[App] Formatted history:", formattedHistory);
       setChatHistory(formattedHistory);
       
     } catch (error) {
@@ -65,9 +60,7 @@ export default function App() {
 
   // Fetch chat history when authenticated
   useEffect(() => {
-    console.log("[App] useEffect triggered - isAuthenticated:", isAuthenticated);
     if (isAuthenticated) {
-      console.log("[App] User authenticated, fetching chat history...");
       fetchChatHistory();
     }
   }, [isAuthenticated, fetchChatHistory]);
@@ -85,22 +78,32 @@ export default function App() {
   }, []);
 
   const handleNewChat = useCallback(async () => {
-    if (!chatKitControl) {
-      console.warn("[App] ChatKit control not ready");
-      return;
-    }
     try {
       // Create a new thread in the database
       const newThread = await chatThreadApi.createThread("New Chat");
       if (newThread) {
         setCurrentThreadId(newThread.id);
-        // Set the thread in ChatKit
-        if (typeof chatKitControl.setThreadId === "function") {
-          await chatKitControl.setThreadId(newThread.id);
-        } else if (chatKitControl.control?.setThreadId) {
-          await chatKitControl.control.setThreadId(newThread.id);
+        
+        // Add to sidebar immediately (optimistic update)
+        setChatHistory(prev => [
+          {
+            id: newThread.id,
+            title: "New Chat",
+            date: formatDate(new Date()),
+          },
+          ...prev
+        ]);
+        
+        // Try to set the thread in ChatKit if it's ready
+        if (chatKitControl) {
+          if (typeof chatKitControl.setThreadId === "function") {
+            await chatKitControl.setThreadId(newThread.id);
+          } else if (chatKitControl.control?.setThreadId) {
+            await chatKitControl.control.setThreadId(newThread.id);
+          }
         }
-        // Refresh history
+        
+        // Refresh history from API to sync
         await fetchChatHistory();
       }
     } catch (error) {
@@ -116,11 +119,19 @@ export default function App() {
       }
       try {
         setCurrentThreadId(threadId);
-        // Set the thread in ChatKit
+        
+        // Get the OpenAI thread ID from the database
+        const openaiThreadId = await chatThreadApi.getOpenAIThreadId(threadId);
+        
+        if (!openaiThreadId) {
+          return;
+        }
+        
+        // Use OpenAI thread ID with ChatKit
         if (typeof chatKitControl.setThreadId === "function") {
-          await chatKitControl.setThreadId(threadId);
+          await chatKitControl.setThreadId(openaiThreadId);
         } else if (chatKitControl.control?.setThreadId) {
-          await chatKitControl.control.setThreadId(threadId);
+          await chatKitControl.control.setThreadId(openaiThreadId);
         }
       } catch (error) {
         console.error("[App] Error selecting chat", error);
@@ -136,12 +147,10 @@ export default function App() {
   }, [fetchChatHistory]);
 
   const handleChatKitReady = useCallback((element: any) => {
-    console.log("[App] ChatKit ready");
     setChatKitControl(element);
     
     // Fetch chat history for the sidebar
     if (isAuthenticated) {
-      console.log("[App] ChatKit ready, fetching chat history...");
       fetchChatHistory();
     }
 
@@ -150,29 +159,22 @@ export default function App() {
       // Run async operations in a separate function to avoid await in non-async callback
       const syncThreads = async () => {
         try {
-          console.log("[App] Attempting to extract threads from ChatKit...");
-          
           // Try different ways to access threads from ChatKit
           let threads: any[] = [];
           
           if (typeof element.getThreads === "function") {
             threads = await element.getThreads();
-            console.log("[App] Got threads from getThreads():", threads);
           } else if (element.threadList && Array.isArray(element.threadList)) {
             threads = element.threadList;
-            console.log("[App] Got threads from threadList:", threads);
           } else if (element._threads && Array.isArray(element._threads)) {
             threads = element._threads;
-            console.log("[App] Got threads from _threads:", threads);
           }
 
           // Sync threads to database
           if (threads.length > 0) {
-            console.log("[App] Found", threads.length, "threads in ChatKit, syncing to database...");
             for (const thread of threads) {
               try {
                 const threadTitle = thread.title || thread.name || "Untitled Chat";
-                console.log("[App] Creating/syncing thread:", threadTitle);
                 await chatThreadApi.createThread(threadTitle);
               } catch (error) {
                 console.error("[App] Error syncing thread:", error);
@@ -213,6 +215,8 @@ export default function App() {
           onThemeRequest={setScheme}
           onThreadChange={handleThreadChange}
           onChatKitReady={handleChatKitReady}
+          currentThreadId={currentThreadId}
+          onOpenAIThreadIdReady={(openaiThreadId) => {}}
         />
 
         {/* Footer */}

@@ -49,8 +49,6 @@ export function useLegalChat() {
       setError(null);
 
       try {
-        console.log('[useLegalChat] Querying: ', query);
-
         const response = await fetch(`${API_BASE_URL}/api/query`, {
           method: 'POST',
           headers: {
@@ -64,11 +62,6 @@ export function useLegalChat() {
         }
 
         const data = (await response.json()) as QueryResponse;
-        console.log('[useLegalChat] Response received:', {
-          answer: data.answer.substring(0, 100) + '...',
-          sources: data.sourceCount,
-          time: data.elapsedTime,
-        });
 
         return data;
       } catch (err: any) {
@@ -92,8 +85,6 @@ export function useLegalChat() {
       setError(null);
 
       try {
-        console.log('[useLegalChat] Retrieving documents for: ', query);
-
         const response = await fetch(`${API_BASE_URL}/api/retrieve`, {
           method: 'POST',
           headers: {
@@ -107,10 +98,6 @@ export function useLegalChat() {
         }
 
         const data = (await response.json()) as RetrievalResponse;
-        console.log('[useLegalChat] Retrieved:', {
-          results: data.resultsCount,
-          time: data.elapsedTime,
-        });
 
         return data;
       } catch (err: any) {
@@ -179,7 +166,6 @@ export function useLegalChat() {
 
                 if (data.done) {
                   sources = data.sources || [];
-                  console.log('[useLegalChat] Stream complete, sources:', sources.length);
                 } else if (data.chunk) {
                   onChunk(data.chunk);
                 }

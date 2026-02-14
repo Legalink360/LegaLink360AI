@@ -38,8 +38,6 @@ export class ChatThreadService {
    */
   async getUserChatThreads(userId: string): Promise<ChatThread[]> {
     try {
-      console.log('[ChatThreadService] Fetching threads for user:', userId);
-      
       const { data, error } = await getSupabaseClient()
         .from('chat_threads')
         .select('*')
@@ -53,7 +51,6 @@ export class ChatThreadService {
         return [];
       }
 
-      console.log('[ChatThreadService] Found threads:', data?.length || 0);
       return data || [];
     } catch (error) {
       console.error('[ChatThreadService] Error in getUserChatThreads:', error);
@@ -303,6 +300,92 @@ export class ChatThreadService {
     } catch (error) {
       console.error('Error in togglePinThread:', error);
       return false;
+    }
+  }
+
+  /**
+   * Store OpenAI thread ID for a local thread
+   */
+  async storeOpenAIThreadId(
+    threadId: string,
+    userId: string,
+    openaiThreadId: string,
+    openaiSessionId?: string
+  ): Promise<ChatThread | null> {
+    try {
+      const { data, error } = await getSupabaseClient()
+        .from('chat_threads')
+        .update({
+          openai_thread_id: openaiThreadId,
+          openai_session_id: openaiSessionId || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', threadId)
+        .eq('user_id', userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[ChatThreadService] Error storing OpenAI thread ID:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('[ChatThreadService] Error in storeOpenAIThreadId:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get OpenAI thread ID for a local thread
+   */
+  async getOpenAIThreadId(threadId: string, userId: string): Promise<string | null> {
+    try {
+      const { data, error } = await getSupabaseClient()
+        .from('chat_threads')
+        .select('openai_thread_id')
+        .eq('id', threadId)
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        console.error('[ChatThreadService] Error fetching OpenAI thread ID:', error);
+        return null;
+      }
+
+      return data?.openai_thread_id || null;
+    } catch (error) {
+      console.error('[ChatThreadService] Error in getOpenAIThreadId:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Find local thread by OpenAI thread ID
+   */
+  async findThreadByOpenAIThreadId(openaiThreadId: string, userId: string): Promise<ChatThread | null> {
+    try {
+      const { data, error } = await getSupabaseClient()
+        .from('chat_threads')
+        .select('*')
+        .eq('openai_thread_id', openaiThreadId)
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // Not found - this is expected
+          return null;
+        }
+        console.error('[ChatThreadService] Error finding thread by OpenAI ID:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('[ChatThreadService] Error in findThreadByOpenAIThreadId:', error);
+      return null;
     }
   }
 }

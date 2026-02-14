@@ -525,6 +525,80 @@ app.post('/api/chat/threads/:threadId/pin', async (req: Request, res: Response) 
   }
 });
 
+/**
+ * POST /api/chat/threads/:threadId/openai-thread
+ * Store OpenAI thread ID for a local thread (called after ChatKit session is created)
+ */
+app.post('/api/chat/threads/:threadId/openai-thread', async (req: Request, res: Response) => {
+  try {
+    const userId = extractUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { threadId } = req.params;
+    const { openaiThreadId, openaiSessionId } = req.body;
+
+    if (!openaiThreadId) {
+      return res.status(400).json({ error: 'openaiThreadId is required' });
+    }
+
+    console.log('[POST /api/chat/threads/:threadId/openai-thread] Storing OpenAI thread ID:', openaiThreadId);
+
+    const thread = await chatThreadService.storeOpenAIThreadId(
+      threadId,
+      userId,
+      openaiThreadId,
+      openaiSessionId
+    );
+
+    if (!thread) {
+      return res.status(404).json({ error: 'Thread not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'OpenAI thread ID stored',
+      thread,
+    });
+  } catch (error: any) {
+    console.error('Error storing OpenAI thread ID:', error);
+    res.status(500).json({
+      error: 'Failed to store OpenAI thread ID',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/chat/threads/:threadId/openai-thread
+ * Get OpenAI thread ID for a local thread
+ */
+app.get('/api/chat/threads/:threadId/openai-thread', async (req: Request, res: Response) => {
+  try {
+    const userId = extractUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { threadId } = req.params;
+
+    const openaiThreadId = await chatThreadService.getOpenAIThreadId(threadId, userId);
+
+    res.json({
+      success: true,
+      threadId,
+      openaiThreadId,
+    });
+  } catch (error: any) {
+    console.error('Error fetching OpenAI thread ID:', error);
+    res.status(500).json({
+      error: 'Failed to fetch OpenAI thread ID',
+      message: error.message,
+    });
+  }
+});
+
 // ============================================================================
 // 404 Handler
 // ============================================================================

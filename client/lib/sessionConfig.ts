@@ -158,27 +158,4 @@ export function validateSessionConfig(): {
   };
 }
 
-// Log configuration on app start
-if (typeof window !== 'undefined') {
-  const validation = validateSessionConfig();
-  
-  if (!validation.valid) {
-    console.error('❌ Session configuration errors:', validation.errors);
-  }
-  
-  if (validation.warnings.length > 0) {
-    console.warn('⚠️ Session configuration warnings:', validation.warnings);
-  }
-  
-  if (validation.valid && validation.warnings.length === 0) {
-    console.log('✅ Session configuration valid');
-    console.log('📋 Configuration:', {
-      tokenTimeout: `${SESSION_CONFIG.timeouts.GET_CURRENT_USER / 1000}s`,
-      activityBased: SESSION_CONFIG.refresh.ACTIVITY_BASED ? 'Yes' : 'No',
-      caching: SESSION_CONFIG.persistence.ENABLED ? 'Enabled' : 'Disabled',
-      maxRetries: SESSION_CONFIG.onTimeout.MAX_RETRIES,
-    });
-  }
-}
-
 export default SESSION_CONFIG;

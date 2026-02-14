@@ -7,8 +7,8 @@ export const metadata: Metadata = {
   title: "LegaLink360 AI",
   description: "Your intelligent legal assistant by LegaLink & Co. Advocates - providing accessible legal guidance and support.",
   icons: {
-    icon: "/logo/LegaLink360.png", // Favicon
-    apple: "/logo/LegaLink360.png", // Apple touch icon
+    icon: "/favicon.ico",
+    apple: "/logo/LegaLink360-192.png",
   },
   manifest: "/manifest.json",
   other: {

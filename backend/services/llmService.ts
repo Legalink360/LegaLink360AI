@@ -64,7 +64,6 @@ ${context}
 Please provide a comprehensive answer citing the relevant sources using [Source X] notation.`;
 
     try {
-      console.log('[LLM] Generating answer with GPT-4-turbo...');
       const startTime = Date.now();
 
       const response = await this.openai.chat.completions.create({
@@ -76,10 +75,6 @@ Please provide a comprehensive answer citing the relevant sources using [Source 
         max_tokens: 2000,
         temperature: 0.7,
       });
-
-      const elapsed = Date.now() - startTime;
-      console.log(`   ✓ Answer generated in ${elapsed}ms`);
-      console.log(`   ✓ Tokens used: ${response.usage?.total_tokens}\n`);
 
       const answer = response.choices[0].message.content || 'No response generated';
       return answer + this.getDisclaimer();
@@ -110,7 +105,6 @@ Be professional and accurate.`;
     const userPrompt = `Question: ${query}\n\nDocuments:\n${context}\n\nProvide detailed answer with citations.`;
 
     try {
-      console.log('[LLM-STREAM] Generating answer stream...');
       const stream = await this.openai.chat.completions.create({
         model: 'gpt-4-turbo',
         messages: [
@@ -130,8 +124,6 @@ Be professional and accurate.`;
 
       // Yield disclaimer at the end of stream
       yield this.getDisclaimer();
-
-      console.log('   ✓ Stream completed\n');
     } catch (error: any) {
       throw new Error(`Stream generation failed: ${error.message}`);
     }

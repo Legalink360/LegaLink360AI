@@ -87,7 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             // IMPROVEMENT: Set up automatic silent token refresh (every 6 days)
             refreshIntervalId = setupAutoTokenRefresh();
-            console.log('✅ Auto-refresh enabled - tokens will refresh silently');
           }
           
           // Step 4: Set loading to false

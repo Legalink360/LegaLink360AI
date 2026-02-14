@@ -36,8 +36,6 @@ export const chatThreadApi = {
         console.error('[chatThreadApi] No auth token available');
         return [];
       }
-
-      console.log('[chatThreadApi] Fetching threads from:', `${API_BASE_URL}/api/chat/threads`);
       
       const response = await fetch(`${API_BASE_URL}/api/chat/threads`, {
         headers: {
@@ -52,7 +50,6 @@ export const chatThreadApi = {
       }
 
       const data = await response.json();
-      console.log('[chatThreadApi] Threads fetched successfully:', data);
       return data.threads || [];
     } catch (error) {
       console.error('[chatThreadApi] Error fetching chat threads:', error);
@@ -268,6 +265,83 @@ export const chatThreadApi = {
     } catch (error) {
       console.error('Error updating thread message:', error);
       return false;
+    }
+  },
+
+  /**
+   * Store OpenAI thread ID for a local thread
+   */
+  async storeOpenAIThreadId(
+    threadId: string,
+    openaiThreadId: string,
+    openaiSessionId?: string
+  ): Promise<boolean> {
+    try {
+      const session = await getSupabaseClient().auth.getSession();
+      const token = session.data.session?.access_token;
+
+      if (!token) {
+        console.error('[chatThreadApi] No auth token available');
+        return false;
+      }
+
+      console.log('[chatThreadApi] Storing OpenAI thread ID:', openaiThreadId);
+
+      const response = await fetch(`${API_BASE_URL}/api/chat/threads/${threadId}/openai-thread`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          openaiThreadId,
+          openaiSessionId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[chatThreadApi] Failed to store OpenAI thread ID:', response.status, errorText);
+        return false;
+      }
+
+      console.log('[chatThreadApi] OpenAI thread ID stored successfully');
+      return true;
+    } catch (error) {
+      console.error('[chatThreadApi] Error storing OpenAI thread ID:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Get OpenAI thread ID for a local thread
+   */
+  async getOpenAIThreadId(threadId: string): Promise<string | null> {
+    try {
+      const session = await getSupabaseClient().auth.getSession();
+      const token = session.data.session?.access_token;
+
+      if (!token) {
+        console.error('[chatThreadApi] No auth token available');
+        return null;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/chat/threads/${threadId}/openai-thread`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.error('[chatThreadApi] Failed to get OpenAI thread ID:', response.statusText);
+        return null;
+      }
+
+      const data = await response.json();
+      return data.openaiThreadId || null;
+    } catch (error) {
+      console.error('[chatThreadApi] Error fetching OpenAI thread ID:', error);
+      return null;
     }
   },
 };

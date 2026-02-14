@@ -268,7 +268,6 @@ export async function getCurrentUser(retryCount = 0): Promise<AuthUser | null> {
       // Timeout or error occurred - try cache first (don't logout!)
       const cachedSession = sessionCache.getSession();
       if (cachedSession) {
-        console.log('✅ Using cached session (network timeout/error)');
         return {
           id: cachedSession.user.id,
           email: cachedSession.user.email,
@@ -289,7 +288,6 @@ export async function getCurrentUser(retryCount = 0): Promise<AuthUser | null> {
       // No session - try cache
       const cachedSession = sessionCache.getSession();
       if (cachedSession) {
-        console.log('✅ Using cached session (no active session)');
         return {
           id: cachedSession.user.id,
           email: cachedSession.user.email,
@@ -327,7 +325,6 @@ export async function getCurrentUser(retryCount = 0): Promise<AuthUser | null> {
     // Try cache on any exception
     const cachedSession = sessionCache.getSession();
     if (cachedSession) {
-      console.log('✅ Using cached session after error');
       return {
         id: cachedSession.user.id,
         email: cachedSession.user.email,
@@ -388,7 +385,6 @@ export async function refreshSession(): Promise<boolean> {
       });
     }
     
-    console.log('✅ Session refreshed successfully');
     return true;
   } catch (error) {
     // Check if it's an abort error (safe - request was optimally cancelled by Supabase)
@@ -425,8 +421,6 @@ export function setupAutoTokenRefresh(): NodeJS.Timeout | null {
       const success = await refreshSession();
       if (!success) {
         console.warn('⚠️ Background token refresh failed - will retry on next interval');
-      } else {
-        console.log('✅ Background token refresh succeeded');
       }
     } catch (error) {
       console.error('Error in auto-refresh:', error);
@@ -539,8 +533,6 @@ export async function loadUserProfile(userId: string): Promise<Partial<AuthUser>
 
     // Profile doesn't exist - create it automatically on first login
     if (!profiles || profiles.length === 0) {
-      console.log('Creating profile on first login for user:', userId);
-      
       try {
         const { error: insertError } = await getSupabaseClient()
           .from('user_profiles')
@@ -559,8 +551,6 @@ export async function loadUserProfile(userId: string): Promise<Partial<AuthUser>
           } else {
             console.error('Failed to create profile:', insertError);
           }
-        } else {
-          console.log('✅ Profile created on login');
         }
       } catch (insertErr) {
         console.error('Error creating profile:', insertErr);

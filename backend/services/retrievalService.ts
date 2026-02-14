@@ -56,15 +56,10 @@ export class RetrievalService {
     topK: number = 5
   ): Promise<SearchResult[]> {
     try {
-      console.log(`[RETRIEVAL] Searching for: "${query}"`);
-      
       // Generate query embedding
-      console.log('   ⏳ Generating embedding...');
       const queryEmbedding = await this.generateQueryEmbedding(query);
-      console.log('   ✓ Embedding generated');
 
       // Search Pinecone
-      console.log(`   ⏳ Searching Pinecone...`);
       const index = this.pinecone.Index(this.indexName);
       const searchResults = await index.query({
         vector: queryEmbedding,
@@ -72,14 +67,11 @@ export class RetrievalService {
         includeMetadata: true,
       });
 
-      console.log(`   ✓ Found ${searchResults.matches?.length || 0} matches`);
-
       if (!searchResults.matches || searchResults.matches.length === 0) {
         return [];
       }
 
       // Fetch full content from Supabase
-      console.log('   ⏳ Fetching content from Supabase...');
       const results: SearchResult[] = [];
       for (const match of searchResults.matches) {
         try {
@@ -104,7 +96,6 @@ export class RetrievalService {
         }
       }
 
-      console.log(`   ✓ Retrieved ${results.length} full documents\n`);
       return results;
     } catch (error: any) {
       console.error('Search error:', error);

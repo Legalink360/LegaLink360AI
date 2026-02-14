@@ -12,6 +12,7 @@ import {
 } from "@/lib/config";
 import type { ColorScheme } from "@/hooks/useColorScheme";
 import { useLegalChat } from "@/hooks/useLegalChat";
+import { chatThreadApi } from "@/lib/chatThreadApi";
 
 // Get API base URL from environment, default to localhost for development
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
@@ -29,6 +30,8 @@ type ChatAreaProps = {
   onThemeRequest: (scheme: ColorScheme) => void;
   onThreadChange?: (threadId: string | null) => void;
   onChatKitReady?: (control: any) => void;
+  currentThreadId?: string | null;
+  onOpenAIThreadIdReady?: (openaiThreadId: string) => void;
 };
 
 type ErrorState = {
@@ -55,6 +58,8 @@ export default function ChatArea({
   onThemeRequest,
   onThreadChange,
   onChatKitReady,
+  currentThreadId,
+  onOpenAIThreadIdReady,
 }: ChatAreaProps) {
   // Legal Chat Hook - exposes queryLegalAI and retrieveDocuments functions
   const { 
@@ -157,14 +162,6 @@ export default function ChatArea({
 
   const getClientSecret = useCallback(
     async (currentSecret: string | null) => {
-      if (isDev) {
-        console.info("[ChatArea] getClientSecret invoked", {
-          currentSecretPresent: Boolean(currentSecret),
-          workflowId: WORKFLOW_ID,
-          endpoint: CREATE_SESSION_ENDPOINT,
-        });
-      }
-
       if (!isWorkflowConfigured) {
         const detail =
           "Set NEXT_PUBLIC_CHATKIT_WORKFLOW_ID in your .env.local file.";
@@ -181,9 +178,6 @@ export default function ChatArea({
         if (!currentSecret) {
           setIsInitializingSession((prev) => {
             if (prev === false) {
-              if (isDev) {
-                console.debug("[ChatArea] Starting session initialization");
-              }
               return true;
             }
             return prev;
@@ -209,14 +203,6 @@ export default function ChatArea({
         });
 
         const raw = await response.text();
-
-        if (isDev) {
-          console.info("[ChatArea] createSession response", {
-            status: response.status,
-            ok: response.ok,
-            bodyPreview: raw.slice(0, 1600),
-          });
-        }
 
         let data: Record<string, unknown> = {};
         if (raw) {
@@ -469,16 +455,48 @@ Visit **[www.legalink360.com](https://www.legalink360.com)** to connect with our
   }
 
   useEffect(() => {
-    if (chatkit.control && onChatKitReady) {
+    if (chatkit.control && onChatKitReady && currentThreadId) {
       // Wait a tick to ensure ChatKit element is fully ready with all methods
       setTimeout(() => {
         // Pass the ref element directly so parent can call methods on it
         if (chatKitRef.current) {
           onChatKitReady(chatKitRef.current);
+
+          // Capture OpenAI thread ID from ChatKit and store it
+          const captureOpenAIThreadId = async () => {
+            try {
+              // Try to get the current thread ID from ChatKit
+              let openaiThreadId: string | null = null;
+
+              // Try different ways to access the thread ID from ChatKit
+              if (chatKitRef.current?.threadId) {
+                openaiThreadId = chatKitRef.current.threadId;
+              } else if (chatKitRef.current?.getCurrentThreadId) {
+                openaiThreadId = await chatKitRef.current.getCurrentThreadId();
+              } else if (chatKitRef.current?._currentThreadId) {
+                openaiThreadId = chatKitRef.current._currentThreadId;
+              }
+
+              if (openaiThreadId && currentThreadId) {
+                const stored = await chatThreadApi.storeOpenAIThreadId(
+                  currentThreadId,
+                  openaiThreadId
+                );
+                if (stored) {
+                  onOpenAIThreadIdReady?.(openaiThreadId);
+                }
+              }
+            } catch (error) {
+              console.error("[ChatArea] Error capturing OpenAI thread ID:", error);
+            }
+          };
+
+          // Try to capture the thread ID after a brief delay
+          setTimeout(captureOpenAIThreadId, 500);
         }
       }, 0);
     }
-  }, [chatkit.control, onChatKitReady]);
+  }, [chatkit.control, onChatKitReady, currentThreadId, onOpenAIThreadIdReady]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-slate-800">
