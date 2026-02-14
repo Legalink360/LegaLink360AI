@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, Plus, Settings, LogOut, User, FolderPlus, HelpCircle, Zap, Palette, ChevronsLeft, BookOpen, BoxIcon } from "lucide-react";
+import { Menu, Plus, Settings, LogOut, User, FolderPlus, HelpCircle, Zap, Palette, ChevronsLeft, BookOpen, BoxIcon, MoreVertical, Trash2, Archive, Edit2, Pin } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { signOut } from "@/lib/auth";
 import UserProfileSettings from "./UserProfileSettings";
@@ -36,7 +36,10 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showPersonalization, setShowPersonalization] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [pinnedChats, setPinnedChats] = useState<Set<string>>(new Set());
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const chatMenuRef = useRef<HTMLDivElement>(null);
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -138,7 +141,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                       e.stopPropagation();
                       link.onClick?.();
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium cursor-pointer"
                   >
                     <Icon size={18} />
                     <span>{link.label}</span>
@@ -147,7 +150,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                   <Link
                     key={idx}
                     href={link.href || "#"}
-                    className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium cursor-pointer"
                   >
                     <Icon size={18} />
                     <span>{link.label}</span>
@@ -199,18 +202,95 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
             <div className="space-y-2">
               {chatHistory.length > 0 ? (
                 chatHistory.map((chat) => (
-                  <button
+                  <div
                     key={chat.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectChat?.(chat.id);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 truncate"
-                    title={chat.title}
+                    className="relative group"
+                    onMouseLeave={() => setOpenMenuId(null)}
                   >
-                    <div className="truncate">{chat.title}</div>
-                    <div className="text-xs text-slate-500">{chat.date}</div>
-                  </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectChat?.(chat.id);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 truncate flex items-center justify-between gap-2 cursor-pointer"
+                      title={chat.title}
+                    >
+                      <div className="truncate flex-1 min-w-0">
+                        <div className="truncate">{chat.title}</div>
+                        <div className="text-xs text-slate-500">{chat.date}</div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === chat.id ? null : chat.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-slate-600 rounded flex-shrink-0 cursor-pointer"
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                    </button>
+
+                    {/* Chat Context Menu */}
+                    {openMenuId === chat.id && (
+                      <div
+                        ref={chatMenuRef}
+                        className="absolute right-0 mt-0 top-full bg-slate-800 border border-slate-700 rounded-lg shadow-lg overflow-hidden z-20 min-w-48"
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPinnedChats(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has(chat.id)) {
+                                newSet.delete(chat.id);
+                              } else {
+                                newSet.add(chat.id);
+                              }
+                              return newSet;
+                            });
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 flex items-center gap-2 cursor-pointer"
+                        >
+                          <Pin size={16} />
+                          {pinnedChats.has(chat.id) ? "Unpin Chat" : "Pin Chat"}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // TODO: Implement rename
+                            setOpenMenuId(null);
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 flex items-center gap-2 cursor-pointer"
+                        >
+                          <Edit2 size={16} />
+                          Rename
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // TODO: Implement archive
+                            setOpenMenuId(null);
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 flex items-center gap-2 cursor-pointer"
+                        >
+                          <Archive size={16} />
+                          Archive
+                        </button>
+                        <div className="border-t border-slate-700" />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // TODO: Implement delete
+                            setOpenMenuId(null);
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-red-900/20 transition-colors text-sm text-red-400 hover:text-red-300 flex items-center gap-2 cursor-pointer"
+                        >
+                          <Trash2 size={16} />
+                          Delete Chat
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ))
               ) : (
                 <div className="text-sm text-slate-400 italic px-3 py-4">No chat history</div>
@@ -226,7 +306,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
               <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium cursor-pointer"
                 >
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
                     <User size={16} />
@@ -249,7 +329,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                         setShowProfileSettings(true);
                         setShowUserMenu(false);
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700 cursor-pointer"
                     >
                       <User size={16} />
                       <span>Profile Settings</span>
@@ -259,7 +339,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                         setShowSettings(true);
                         setShowUserMenu(false);
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700 cursor-pointer"
                     >
                       <Settings size={16} />
                       <span>Settings</span>
@@ -269,7 +349,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                         setShowPersonalization(true);
                         setShowUserMenu(false);
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700 cursor-pointer"
                     >
                       <Palette size={16} />
                       <span>Personalization</span>
@@ -279,7 +359,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                         setShowUpgrade(true);
                         setShowUserMenu(false);
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700 cursor-pointer"
                     >
                       <Zap size={16} />
                       <span>Upgrade Plan</span>
@@ -289,7 +369,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                         setShowHelp(true);
                         setShowUserMenu(false);
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700 cursor-pointer"
                     >
                       <HelpCircle size={16} />
                       <span>Help & Support</span>
@@ -297,7 +377,7 @@ export default function Sidebar({ chatHistory = [], onNewChat, onSelectChat }: S
                     <Link
                       href="/?view=landing"
                       onClick={() => setShowUserMenu(false)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700"
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700 transition-colors text-sm text-slate-300 hover:text-slate-100 border-b border-slate-700 cursor-pointer"
                     >
                       <BookOpen size={16} />
                       <span>Learn More</span>
