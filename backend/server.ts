@@ -1,14 +1,15 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { RetrievalService } from './services/retrievalService';
-import { LLMService } from './services/llmService';
-import { ChatThreadService } from './services/chatThreadService';
 
-// Load environment variables only in development
+// Load environment variables FIRST, before importing other modules
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: '.env.local' });
 }
+
+import { RetrievalService } from './services/retrievalService';
+import { LLMService } from './services/llmService';
+import { ChatThreadService } from './services/chatThreadService';
 
 const app = express();
 const PORT = process.env.PORT || process.env.APP_PORT || 3001;
@@ -50,7 +51,11 @@ app.use(express.json({ limit: '10mb' }));
 
 // Logging middleware
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
+  try {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
+  } catch (error) {
+    console.error('[Middleware] Error in logging:', error);
+  }
   next();
 });
 
@@ -599,6 +604,111 @@ app.get('/api/chat/threads/:threadId/openai-thread', async (req: Request, res: R
   }
 });
 
+/**
+ * POST /api/chat/threads/:threadId/messages
+ * Save a message to the chat thread
+ */
+app.post('/api/chat/threads/:threadId/messages', async (req: Request, res: Response) => {
+  try {
+    const userId = extractUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { threadId } = req.params;
+    const { role, content, responseTimeMs, modelUsed, tokensUsed } = req.body;
+
+    // Validate required fields
+    if (!role || !content) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['role', 'content'],
+      });
+    }
+
+    if (!['user', 'assistant'].includes(role)) {
+      return res.status(400).json({
+        error: 'Invalid role. Must be "user" or "assistant"',
+      });
+    }
+
+    if (content.trim().length === 0) {
+      return res.status(400).json({
+        error: 'Content cannot be empty',
+      });
+    }
+
+    console.log(`[POST /api/chat/threads/:threadId/messages] Saving ${role} message for thread ${threadId}`);
+
+    const message = await chatThreadService.saveMessage(
+      threadId,
+      userId,
+      role,
+      content,
+      {
+        responseTimeMs,
+        modelUsed,
+        tokensUsed,
+      }
+    );
+
+    if (!message) {
+      return res.status(400).json({
+        error: 'Failed to save message. Thread may not exist or you may not have permission.',
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: {
+        id: message.id,
+        thread_id: threadId,
+        role,
+        content,
+        created_at: message.created_at,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error saving message:', error);
+    res.status(500).json({
+      error: 'Failed to save message',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/chat/threads/:threadId/messages
+ * Get all messages for a thread
+ */
+app.get('/api/chat/threads/:threadId/messages', async (req: Request, res: Response) => {
+  try {
+    const userId = extractUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { threadId } = req.params;
+
+    console.log(`[GET /api/chat/threads/:threadId/messages] Fetching messages for thread ${threadId}`);
+
+    const messages = await chatThreadService.getThreadMessages(threadId, userId);
+
+    res.json({
+      success: true,
+      threadId,
+      messages,
+      count: messages.length,
+    });
+  } catch (error: any) {
+    console.error('Error fetching thread messages:', error);
+    res.status(500).json({
+      error: 'Failed to fetch thread messages',
+      message: error.message,
+    });
+  }
+});
+
 // ============================================================================
 // 404 Handler
 // ============================================================================
@@ -657,7 +767,7 @@ const server = app.listen(PORT, () => {
 });
 
 // ============================================================================
-// GLOBAL ERROR HANDLERS
+// GLOBAL ERROR HANDLERS - Set up BEFORE starting server
 // ============================================================================
 
 // Handle unhandled promise rejections
@@ -669,4 +779,8 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('uncaughtException', (error) => {
   console.error('[Server] Uncaught Exception:', error);
   // Log but don't exit - allow server to keep running
+});
+
+server.on('error', (error) => {
+  console.error('[Server] Server error:', error);
 });

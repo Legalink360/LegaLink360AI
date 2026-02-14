@@ -388,4 +388,104 @@ export class ChatThreadService {
       return null;
     }
   }
+
+  /**
+   * Save a message to the chat_messages table and update thread stats
+   */
+  async saveMessage(
+    threadId: string,
+    userId: string,
+    role: 'user' | 'assistant',
+    content: string,
+    metadata?: {
+      responseTimeMs?: number;
+      modelUsed?: string;
+      tokensUsed?: number;
+    }
+  ): Promise<{ id: string; created_at: string } | null> {
+    try {
+      // Validate that the thread belongs to the user
+      const thread = await this.getChatThread(threadId, userId);
+      if (!thread) {
+        console.error('[ChatThreadService] saveMessage: Thread not found or unauthorized');
+        return null;
+      }
+
+      // Insert the message
+      const { data, error } = await getSupabaseClient()
+        .from('chat_messages')
+        .insert({
+          thread_id: threadId,
+          user_id: userId,
+          role: role,
+          content: content,
+          response_time_ms: metadata?.responseTimeMs || null,
+          model_used: metadata?.modelUsed || null,
+          tokens_used: metadata?.tokensUsed || null,
+          created_at: new Date().toISOString(),
+        })
+        .select('id, created_at')
+        .single();
+
+      if (error) {
+        console.error('[ChatThreadService] Error saving message:', error);
+        return null;
+      }
+
+      // Update thread metadata
+      const updatedThread = await this.updateThreadMessage(threadId, userId, content);
+      
+      if (!updatedThread) {
+        console.error('[ChatThreadService] Warning: Could not update thread metadata after saving message');
+      }
+
+      // If this is the first user message and thread title is still "New Chat", generate a title
+      if (role === 'user' && thread.title === 'New Chat') {
+        // Generate title from first user message (take first 50 chars)
+        const generatedTitle = content.substring(0, 50).trim();
+        const newTitle = generatedTitle.length > 0 ? generatedTitle : 'New Chat';
+        
+        const titleUpdated = await this.updateThreadTitle(threadId, userId, newTitle);
+        if (!titleUpdated) {
+          console.error('[ChatThreadService] Warning: Could not update thread title');
+        }
+      }
+
+      console.log(`[ChatThreadService] Message saved successfully. ID: ${data.id}, Role: ${role}`);
+      return data;
+    } catch (error) {
+      console.error('[ChatThreadService] Error in saveMessage:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all messages for a thread
+   */
+  async getThreadMessages(threadId: string, userId: string): Promise<any[]> {
+    try {
+      // Validate that the thread belongs to the user
+      const thread = await this.getChatThread(threadId, userId);
+      if (!thread) {
+        console.error('[ChatThreadService] getThreadMessages: Thread not found or unauthorized');
+        return [];
+      }
+
+      const { data, error } = await getSupabaseClient()
+        .from('chat_messages')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('[ChatThreadService] Error fetching thread messages:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('[ChatThreadService] Error in getThreadMessages:', error);
+      return [];
+    }
+  }
 }

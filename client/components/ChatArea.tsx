@@ -81,6 +81,10 @@ export default function ChatArea({
   );
   const [widgetInstanceKey, setWidgetInstanceKey] = useState(0);
 
+  // Message persistence tracking
+  const savedMessagesRef = useRef(new Set<string>());
+  const messageCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const setErrorState = useCallback((updates: Partial<ErrorState>) => {
     setErrors((current) => ({ ...current, ...updates }));
   }, []);
@@ -276,6 +280,105 @@ This response is based on available legal documents and is provided for informat
 
 Visit **[www.legalink360.com](https://www.legalink360.com)** to connect with our legal professionals and get personalized legal guidance for your specific situation.`;
   }, []);
+
+  /**
+   * Save a message to the current thread
+   */
+  const saveMessageToThread = useCallback(
+    async (role: 'user' | 'assistant', content: string) => {
+      if (!currentThreadId || !content) return;
+
+      // Create a unique key for this message to avoid duplicates
+      const messageKey = `${currentThreadId}-${role}-${content.substring(0, 50)}`;
+      
+      // Skip if we've already saved this message
+      if (savedMessagesRef.current.has(messageKey)) {
+        return;
+      }
+
+      try {
+        const result = await chatThreadApi.addMessage(
+          currentThreadId,
+          role,
+          content,
+          {
+            modelUsed: 'gpt-4-turbo',
+          }
+        );
+
+        if (result) {
+          savedMessagesRef.current.add(messageKey);
+          if (isDev) {
+            console.debug('[ChatArea] Message saved to thread:', result.id);
+          }
+        }
+      } catch (error) {
+        console.error('[ChatArea] Failed to save message:', error);
+      }
+    },
+    [currentThreadId]
+  );
+
+  /**
+   * Monitor ChatKit for new messages and save them to the thread
+   * This polls for message changes and captures both user and assistant messages
+   */
+  useEffect(() => {
+    if (!currentThreadId || !isBrowser) {
+      return;
+    }
+
+    // Clear the interval if there's an existing one
+    if (messageCheckIntervalRef.current) {
+      clearInterval(messageCheckIntervalRef.current);
+    }
+
+    // Monitor for new messages every 2 seconds
+    messageCheckIntervalRef.current = setInterval(() => {
+      try {
+        // Find the ChatKit container
+        const chatkitElement = document.querySelector('openai-chatkit');
+        if (!chatkitElement) return;
+
+        // Look for message elements in the chat history
+        const messageElements = chatkitElement.querySelectorAll('[data-testid="message"]');
+        
+        messageElements.forEach((element: any) => {
+          // Extract message content
+          const contentElement = element.querySelector('[data-testid="message-content"]');
+          if (!contentElement) return;
+
+          const content = contentElement.textContent?.trim();
+          if (!content) return;
+
+          // Determine if it's a user or assistant message
+          const isUserMessage = element.classList.contains('user-message') || 
+                               element.getAttribute('data-role') === 'user';
+          const role = isUserMessage ? 'user' : 'assistant';
+
+          // Create a unique key for deduplication
+          const messageKey = `${currentThreadId}-${role}-${content.substring(0, 50)}`;
+
+          // Only save if we haven't already saved this exact message
+          if (!savedMessagesRef.current.has(messageKey)) {
+            saveMessageToThread(role, content);
+          }
+        });
+      } catch (error) {
+        // Silently catch errors to avoid spamming console
+        if (isDev) {
+          console.debug('[ChatArea] Message monitoring error:', error);
+        }
+      }
+    }, 2000);
+
+    return () => {
+      if (messageCheckIntervalRef.current) {
+        clearInterval(messageCheckIntervalRef.current);
+        messageCheckIntervalRef.current = null;
+      }
+    };
+  }, [currentThreadId, saveMessageToThread]);
 
   /**
    * Query legal AI and format response for ChatKit

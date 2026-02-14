@@ -344,4 +344,95 @@ export const chatThreadApi = {
       return null;
     }
   },
+
+  /**
+   * Save a message to a chat thread
+   */
+  async addMessage(
+    threadId: string,
+    role: 'user' | 'assistant',
+    content: string,
+    metadata?: {
+      responseTimeMs?: number;
+      modelUsed?: string;
+      tokensUsed?: number;
+    }
+  ): Promise<{ id: string; created_at: string } | null> {
+    try {
+      const session = await getSupabaseClient().auth.getSession();
+      const token = session.data.session?.access_token;
+
+      if (!token) {
+        console.error('[chatThreadApi] No auth token available');
+        return null;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/chat/threads/${threadId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          role,
+          content,
+          responseTimeMs: metadata?.responseTimeMs,
+          modelUsed: metadata?.modelUsed,
+          tokensUsed: metadata?.tokensUsed,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[chatThreadApi] Failed to save message:', response.status, errorText);
+        return null;
+      }
+
+      const data = await response.json();
+      if (data.message) {
+        console.log('[chatThreadApi] Message saved successfully:', data.message.id);
+        return {
+          id: data.message.id,
+          created_at: data.message.created_at,
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('[chatThreadApi] Error saving message:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Get all messages for a thread
+   */
+  async getThreadMessages(threadId: string): Promise<any[]> {
+    try {
+      const session = await getSupabaseClient().auth.getSession();
+      const token = session.data.session?.access_token;
+
+      if (!token) {
+        console.error('[chatThreadApi] No auth token available');
+        return [];
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/chat/threads/${threadId}/messages`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[chatThreadApi] Failed to fetch thread messages:', response.status, errorText);
+        return [];
+      }
+
+      const data = await response.json();
+      return data.messages || [];
+    } catch (error) {
+      console.error('[chatThreadApi] Error fetching thread messages:', error);
+      return [];
+    }
+  },
 };
