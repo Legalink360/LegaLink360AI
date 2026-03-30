@@ -10,6 +10,7 @@
     "test-connections": "ts-node scripts/testConnections.ts",
     "test-search": "ts-node scripts/testSemanticSearch.ts",
     "ingest-uganda-laws": "ts-node scripts/ingestUgandaLaws.ts",
+    "ingest-uganda-laws-pdf": "ts-node scripts/ingestUgandaLawsPDF.ts",
     "ingest-custom": "ts-node scripts/ingestCustomDocuments.ts"
   },
   "dependencies": {
